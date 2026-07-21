@@ -1,98 +1,84 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Link } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { Pressable, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { HeartDivider } from '@/components/heart';
+import { Image } from '@/components/ui/image';
+import { Wordmark } from '@/components/wordmark';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+/**
+ * The welcome illustration is a fixed light artwork, so this screen commits to
+ * the light palette rather than following the system scheme — dark-scheme text
+ * would disappear against it. That's why there are no `dark:` variants here.
+ */
+export default function WelcomeScreen() {
+  const insets = useSafeAreaInsets();
+
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
+    <View className="flex-1 bg-surface">
+      <StatusBar style="dark" />
+
+      <Image
+        source={require('@/assets/images/illustrations/welcome_bg.png')}
+        className="absolute inset-0"
+        contentFit="cover"
+        contentPosition="bottom center"
+      />
+
+      <View
+        className="w-full max-w-[800px] flex-1 select-none justify-between self-center px-6"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom + 24 }}>
+        <View className="items-center gap-2 pt-8">
+          <Image
+            source={require('@/assets/images/brand/logo.png')}
+            className="h-[120px] w-[148px]"
+            contentFit="cover"
+          />
+          <Wordmark />
+          <HeartDivider />
+          <Text className="text-center font-sans text-sm leading-6 text-ink-muted">
+            Your Feed for Personal Growth
+          </Text>
+
+          <View className="flex-row">
+            <Text className="text-xl font-extrabold text-green-400">Share </Text>
+            <Text className="text-xl font-extrabold">your </Text>
+            <Text className="text-xl font-extrabold text-blue-400">Journey</Text>
+            <Text className="text-xl font-extrabold">.</Text>
+          </View>
+          <View className="flex-row">
+            <Text className="text-xl font-extrabold text-violet-400">Inspire </Text>
+            <Text className="text-xl font-extrabold">others.</Text>
+          </View>
+
+          <Text className="text-center font-sans text-sm leading-6 text-ink-muted">
+            Winly is a positive community where you can share your self-care, celebrate small wins,
+            and grow together.
+          </Text>
+        </View>
+
+        <View className="gap-2">
+          <Link href="/register" asChild>
+            <Pressable
+              accessibilityRole="button"
+              className="items-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500 py-4 active:opacity-85"
+              style={{ boxShadow: '0 8px 20px rgba(34, 197, 94, 0.35)' }}>
+              <Text className="font-body-semibold text-base leading-6 text-white">Get started</Text>
+            </Pressable>
+          </Link>
+
+          <Link href="/login" asChild>
+            <Pressable accessibilityRole="button" className="active:opacity-85">
+              <View className="rounded-full  p-[2px]">
+                <View className="items-center rounded-full bg-transparent px-8 py-4">
+                  <Text className="font-body-semibold text-base leading-6 text-gray-900">Log In</Text>
+                </View>
+              </View>
+            </Pressable>
+          </Link>
+        </View>
+      </View>
+    </View>
   );
 }
-
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
-});

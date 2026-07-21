@@ -1,9 +1,77 @@
-:root {
-  --font-display:
-    Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji,
+@import 'tailwindcss';
+@import 'uniwind';
+
+@theme {
+  /* Brand type stack — the family names are registered at runtime by
+     expo-font (see hooks/use-brand-fonts.ts), with system fallbacks.
+     These are static (non-variable) faces: set the family alone and leave
+     font-weight off, otherwise Android synthesizes a second, wrong weight.
+     Names avoid Tailwind's own weight utilities (font-medium, font-bold,
+     font-semibold) so the two never collide on one class name. */
+  --font-logo:
+    PlusJakartaSans_700Bold, 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: Sora_600SemiBold, Sora, ui-sans-serif, system-ui, sans-serif;
+  --font-heading-bold: Sora_700Bold, Sora, ui-sans-serif, system-ui, sans-serif;
+  --font-sans:
+    Inter_400Regular, Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji,
     Segoe UI Symbol, Noto Color Emoji;
+  --font-body-medium: Inter_500Medium, Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-body-semibold: Inter_600SemiBold, Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-body-bold: Inter_700Bold, Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-sans);
   --font-mono:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
   --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
   --font-serif: Georgia, 'Times New Roman', serif;
+
+  /* Winly "Fresh Growth" palette. Declared here so the utilities exist
+     (bg-primary, text-ink, border-hairline, …); the per-scheme values live in
+     the @layer theme block below. Keep in sync with constants/theme.ts. */
+  --color-primary: #22c55e;
+  --color-primary-fg: #ffffff;
+  --color-secondary: #38bdf8;
+  --color-accent: #8b5cf6;
+  --color-highlight: #fb7185;
+  --color-sunshine: #facc15;
+  --color-surface: #f8fafc;
+  --color-surface-card: #ffffff;
+  --color-surface-selected: #e2e8f0;
+  --color-ink: #0f172a;
+  --color-ink-muted: #64748b;
+  --color-hairline: #e2e8f0;
+}
+
+@layer theme {
+  :root {
+    @variant light {
+      --color-primary: #22c55e;
+      --color-primary-fg: #ffffff;
+      --color-secondary: #38bdf8;
+      --color-accent: #8b5cf6;
+      --color-highlight: #fb7185;
+      --color-sunshine: #facc15;
+      --color-surface: #f8fafc;
+      --color-surface-card: #ffffff;
+      --color-surface-selected: #e2e8f0;
+      --color-ink: #0f172a;
+      --color-ink-muted: #64748b;
+      --color-hairline: #e2e8f0;
+    }
+
+    /* Lifted toward the lighter end of each hue so they clear contrast on slate. */
+    @variant dark {
+      --color-primary: #4ade80;
+      --color-primary-fg: #052e16;
+      --color-secondary: #7dd3fc;
+      --color-accent: #a78bfa;
+      --color-highlight: #fda4af;
+      --color-sunshine: #fde047;
+      --color-surface: #0f172a;
+      --color-surface-card: #1e293b;
+      --color-surface-selected: #334155;
+      --color-ink: #f8fafc;
+      --color-ink-muted: #94a3b8;
+      --color-hairline: #334155;
+    }
+  }
 }
