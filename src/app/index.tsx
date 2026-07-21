@@ -1,4 +1,4 @@
-import { Link } from 'expo-router';
+import { Link, Redirect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeartDivider } from '@/components/heart';
 import { Image } from '@/components/ui/image';
 import { Wordmark } from '@/components/wordmark';
+import { useAuth } from '@/lib/auth-context';
 
 /**
  * The welcome illustration is a fixed light artwork, so this screen commits to
@@ -14,6 +15,11 @@ import { Wordmark } from '@/components/wordmark';
  */
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
+  const { isAuthenticated } = useAuth();
+
+  // A stored token was already exchanged for a user before the navigator
+  // mounted, so anyone still signed in skips the sign-up pitch entirely.
+  if (isAuthenticated) return <Redirect href="/(tabs)/home" />;
 
   return (
     <View className="flex-1 bg-surface">
