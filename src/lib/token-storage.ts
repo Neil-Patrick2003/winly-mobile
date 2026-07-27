@@ -1,24 +1,46 @@
+/**
+ * Holds the Sanctum token for the current session in the device keystore —
+ * the iOS Keychain and Android Keystore — so it survives reloads and relaunches.
+ *
+ * SecureStore is used over AsyncStorage because this is a credential: a bearer
+ * token in AsyncStorage sits unencrypted in a SQLite file that a rooted device
+ * or a device backup can read. Its ~2048-byte practical limit is far above a
+ * Sanctum token.
+ *
+ * SecureStore is a native module, so it has to be compiled into the installed
+ * binary — adding it to package.json is not enough, the dev build must be
+ * rebuilt or the import throws "Cannot find native module 'ExpoSecureStore'".
+ * See `token-storage.web.ts` for the web build, which uses localStorage.
+ *
+ * Reads and writes are defensive: a keystore failure should sign the user out,
+ * never crash the app on launch.
+ */
+
 import * as SecureStore from 'expo-secure-store';
 
-/**
- * Persists the Sanctum token in the iOS Keychain / Android Keystore.
- *
- * Surviving a reload is the point: without it every reload mints a fresh token
- * on the next sign-in and abandons the old one, which stays valid server-side
- * because logout only revokes the token it was called with.
- *
- * See `token-storage.web.ts` for the browser fallback.
- */
 const TOKEN_KEY = 'winly.auth.token';
 
 export async function saveToken(token: string) {
-  await SecureStore.setItemAsync(TOKEN_KEY, token);
+  try {
+    await SecureStore.setItemAsync(TOKEN_KEY, token);
+  } catch {
+    // Nothing actionable here — the session still works for this launch, it
+    // just will not be restored on the next one.
+  }
 }
 
 export async function loadToken() {
-  return SecureStore.getItemAsync(TOKEN_KEY);
+  try {
+    return await SecureStore.getItemAsync(TOKEN_KEY);
+  } catch {
+    return null;
+  }
 }
 
 export async function clearToken() {
-  await SecureStore.deleteItemAsync(TOKEN_KEY);
+  try {
+    await SecureStore.deleteItemAsync(TOKEN_KEY);
+  } catch {
+    // Already gone, or unreadable. Either way there is nothing to remove.
+  }
 }

@@ -40,7 +40,20 @@
           "imageWidth": 76
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-video",
+        {
+          "supportsBackgroundPlayback": false,
+          "supportsPictureInPicture": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Winly needs access to your photos so you can attach one to a movement or learning entry."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

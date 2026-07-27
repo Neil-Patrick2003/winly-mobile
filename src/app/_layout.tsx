@@ -83,12 +83,16 @@ function RootNavigator() {
       <Stack.Screen name="index" />
       <Stack.Screen name="register" options={SWAP} />
       <Stack.Screen name="login" options={SWAP} />
+      <Stack.Screen name="settings" />
       {/* Entering the app is a context change, not a push — and the swipe-back
           gesture is disabled so you cannot slide back into the auth flow. */}
       <Stack.Screen
         name="(tabs)"
         options={{ animation: 'fade', animationDuration: 300, gestureEnabled: false }}
       />
+      {/* The ESC entry flow presents over the tabs — full screen, its own top
+          bar, dismissed by the flow's close control. */}
+      <Stack.Screen name="entry" options={{ presentation: 'modal' }} />
     </Stack>
   );
 }

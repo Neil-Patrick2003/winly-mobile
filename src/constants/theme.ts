@@ -89,6 +89,7 @@ export const Fonts = {
   ...SystemFonts,
   /** Wordmark only — Plus Jakarta Sans Bold */
   logo: 'PlusJakartaSans_700Bold',
+  logoExtraBold: 'PlusJakartaSans_800ExtraBold',
   /** Headings — Sora SemiBold */
   heading: 'Sora_600SemiBold',
   headingBold: 'Sora_700Bold',

@@ -1,32 +1,149 @@
-import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { useColorScheme } from 'react-native';
+import { Tabs, TabList, TabSlot, TabTrigger, type TabTriggerSlotProps } from 'expo-router/ui';
+import { SymbolView, type SymbolViewProps } from 'expo-symbols';
+import { Pressable, Text, View, type ViewProps } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors } from '@/constants/theme';
 
-export default function AppTabs() {
-  const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+type Icon = SymbolViewProps['name'];
+
+/**
+ * The bar itself. `TabList asChild` hands its props down, so this is the row
+ * that actually renders — safe-area padding included, since it sits flush with
+ * the bottom edge.
+ */
+function TabBar({ children, style, ...props }: ViewProps) {
+  const insets = useSafeAreaInsets();
 
   return (
-    <NativeTabs
-      backgroundColor={colors.background}
-      indicatorColor={colors.backgroundElement}
-      labelStyle={{ selected: { color: colors.text } }}>
-      <NativeTabs.Trigger name="home">
-        <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/home.png')}
-          renderingMode="template"
-        />
-      </NativeTabs.Trigger>
+    <View
+      {...props}
+      className="flex-row items-end justify-center gap-1 border-t border-hairline bg-surface-card px-2 pt-3"
+      style={[
+        // On a gesture-bar device the inset already supplies the breathing room
+        // below; on a device without one, 14 stands in for it.
+        { paddingBottom: Math.max(insets.bottom, 14) },
+        style,
+      ]}>
+      {children}
+    </View>
+  );
+}
 
-      <NativeTabs.Trigger name="explore">
-        <NativeTabs.Trigger.Label>Explore</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/explore.png')}
-          renderingMode="template"
-        />
-      </NativeTabs.Trigger>
-    </NativeTabs>
+/**
+ * The caption under every tab. Leading is pinned to the glyph height: the
+ * default line box on an 11px font adds a few points of air that read as a gap
+ * under the icon.
+ */
+function TabLabel({ children, isFocused }: { children: string; isFocused?: boolean }) {
+  return (
+    <Text
+      className={`mt-1 font-sans text-[11px] leading-[13px] ${
+        isFocused ? 'text-primary' : 'text-ink-muted'
+      }`}>
+      {children}
+    </Text>
+  );
+}
+
+/** Icon over label. The filled variant marks the active tab on iOS. */
+function TabButton({
+  icon,
+  activeIcon,
+  label,
+  isFocused,
+  ...props
+}: TabTriggerSlotProps & { icon: Icon; activeIcon: Icon; label: string }) {
+  const tint = isFocused ? Colors.light.primary : Colors.light.textSecondary;
+
+  return (
+    <Pressable
+      {...props}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: isFocused }}
+      accessibilityLabel={label}
+      className="px-2 active:opacity-60">
+      {/* A plain View owns the stacking. Pressable does not reliably lay its
+          children out as a column here, so icon and label ended up side by
+          side; a View always defaults to `flexDirection: 'column'`. */}
+      <View className="flex-col items-center">
+        <SymbolView name={isFocused ? activeIcon : icon} size={24} tintColor={tint} />
+        <TabLabel isFocused={isFocused}>{label}</TabLabel>
+      </View>
+    </Pressable>
+  );
+}
+
+/**
+ * Create. A rounded square rather than an icon, so it reads as an action, but
+ * captioned like the rest so the row of labels stays level.
+ */
+function CreateButton({ isFocused, ...props }: TabTriggerSlotProps) {
+  return (
+    <Pressable
+      {...props}
+      accessibilityRole="button"
+      accessibilityState={{ selected: isFocused }}
+      accessibilityLabel="Create"
+      className="px-2 active:opacity-60">
+      <View className="flex-col items-center">
+        <View className="h-7 w-7 items-center justify-center rounded-lg bg-gray-100">
+          <SymbolView
+            name={{ ios: 'plus', android: 'add', web: 'add' }}
+            size={18}
+            weight="semibold"
+            tintColor={isFocused ? Colors.light.primary : Colors.light.text}
+          />
+        </View>
+        <TabLabel isFocused={isFocused}>Create</TabLabel>
+      </View>
+    </Pressable>
+  );
+}
+
+export default function AppTabs() {
+  return (
+    <Tabs>
+      <TabSlot />
+      <TabList asChild>
+        <TabBar>
+          <TabTrigger name="home" href="/home" asChild>
+            <TabButton
+              label="Home"
+              icon={{ ios: 'house', android: 'home', web: 'home' }}
+              activeIcon={{ ios: 'house.fill', android: 'home', web: 'home' }}
+            />
+          </TabTrigger>
+
+          <TabTrigger name="discover" href="/discover" asChild>
+            <TabButton
+              label="Discover"
+              icon={{ ios: 'safari', android: 'explore', web: 'explore' }}
+              activeIcon={{ ios: 'safari.fill', android: 'explore', web: 'explore' }}
+            />
+          </TabTrigger>
+
+          <TabTrigger name="create" href="/create" asChild>
+            <CreateButton />
+          </TabTrigger>
+
+          <TabTrigger name="notifications" href="/notifications" asChild>
+            <TabButton
+              label="Alerts"
+              icon={{ ios: 'bell', android: 'notifications', web: 'notifications' }}
+              activeIcon={{ ios: 'bell.fill', android: 'notifications', web: 'notifications' }}
+            />
+          </TabTrigger>
+
+          <TabTrigger name="profile" href="/profile" asChild>
+            <TabButton
+              label="Profile"
+              icon={{ ios: 'person', android: 'person', web: 'person' }}
+              activeIcon={{ ios: 'person.fill', android: 'person', web: 'person' }}
+            />
+          </TabTrigger>
+        </TabBar>
+      </TabList>
+    </Tabs>
   );
 }

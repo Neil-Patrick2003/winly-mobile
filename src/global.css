@@ -10,6 +10,8 @@
      font-semibold) so the two never collide on one class name. */
   --font-logo:
     PlusJakartaSans_700Bold, 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-logo-extrabold:
+    PlusJakartaSans_800ExtraBold, 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
   --font-heading: Sora_600SemiBold, Sora, ui-sans-serif, system-ui, sans-serif;
   --font-heading-bold: Sora_700Bold, Sora, ui-sans-serif, system-ui, sans-serif;
   --font-sans:

@@ -7,12 +7,16 @@
 import { useFonts } from 'expo-font';
 
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
-import { PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
+import {
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold,
+} from '@expo-google-fonts/plus-jakarta-sans';
 import { Sora_600SemiBold, Sora_700Bold } from '@expo-google-fonts/sora';
 
 export function useBrandFonts() {
   const [loaded, error] = useFonts({
     PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
     Sora_600SemiBold,
     Sora_700Bold,
     Inter_400Regular,
