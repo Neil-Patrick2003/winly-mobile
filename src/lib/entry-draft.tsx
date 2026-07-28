@@ -1,59 +1,147 @@
 import { createContext, use, useMemo, useState, type ReactNode } from 'react';
 
+import { useAuth } from '@/lib/auth-context';
+import { createPost, toMovementType, type LocalFile, type NewWin, type Post } from '@/lib/posts';
+
 /**
- * The in-progress ESC entry, shared across the three pillar screens of the
- * Create flow. Living at the `entry/` layout means it survives navigating
- * between pillars — going back to Meditation after Learning keeps what was
- * typed — and gives the final Share one object to submit.
+ * The in-progress small win, shared across the flow's step screens. Living at
+ * the `entry/` layout means it survives navigating between steps — going back
+ * to Meditation after Learning keeps what was typed — and gives Review one
+ * object to submit.
+ *
+ * Every pillar carries its own `completed` flag rather than inferring it from
+ * whether the fields are filled in: "I meditated but would rather not say what"
+ * is a win too, and the Skip control depends on the difference.
  *
  * No backend yet: `submit` is where the POST goes once there is an endpoint.
  */
 export type MeditationDraft = {
-  categoryId: string | null;
+  /** How long they sat, in whole minutes. */
+  minutes: number | null;
+  /** They ran the in-app countdown rather than just logging a length. */
+  usedTimer: boolean;
+  /**
+   * The full sit happened. Derived rather than declared: choosing a length says
+   * so, and opening the timer takes it back until the countdown reaches zero.
+   * False on a shared win is what reads as "stopped early".
+   */
   completed: boolean;
-  notes: string;
 };
 
 export type LearningDraft = {
-  title: string;
-  /** Optional reference link. */
-  link: string;
-  reflection: string;
-  /** Local photo URIs, uploaded on submit. */
-  photos: string[];
+  learned: string;
+  /** Free text, not a URL — "that podcast on the drive home" counts. */
+  reference: string;
+  /** Picked from the library, uploaded with the post. */
+  photos: LocalFile[];
+  completed: boolean;
 };
 
+/**
+ * The `activity` value standing for "none of the chips". Kept here rather than
+ * with the chip list because Review has to recognise it too, and read the
+ * free-text field instead of showing the sentinel.
+ */
+export const OTHER_ACTIVITY = 'Others';
+
 export type MovementDraft = {
-  title: string;
-  notes: string;
-  photos: string[];
+  /** One of the ACTIVITIES labels on the Movement step, or OTHER_ACTIVITY. */
+  activity: string | null;
+  /** What they actually did, when `activity` is OTHER_ACTIVITY. */
+  otherActivity: string;
+  photos: LocalFile[];
+  completed: boolean;
 };
 
 export type EntryDraft = {
   meditation: MeditationDraft;
   learning: LearningDraft;
   movement: MovementDraft;
+  /** The words that go out with the post, written on the Review step. */
+  caption: string;
 };
 
 const EMPTY: EntryDraft = {
-  meditation: { categoryId: null, completed: false, notes: '' },
-  learning: { title: '', link: '', reflection: '', photos: [] },
-  movement: { title: '', notes: '', photos: [] },
+  meditation: { minutes: null, usedTimer: false, completed: false },
+  learning: { learned: '', reference: '', photos: [], completed: false },
+  movement: { activity: null, otherActivity: '', photos: [], completed: false },
+  caption: '',
 };
+
+/**
+ * The wins a finished draft turns into, in the order the API returns them.
+ *
+ * The bar for inclusion is this app's, not the API's: a movement win is valid
+ * with nothing but its type, but the Movement step requires an activity before
+ * it will let you past, so an empty one never reaches here.
+ *
+ * Photos ride along on the win they were attached to; `createPost` switches to
+ * multipart when any are present. A pillar carrying *only* photos is still left
+ * out, because its own required field is what makes it a win.
+ */
+export function buildWins(draft: EntryDraft): NewWin[] {
+  const { meditation, learning, movement } = draft;
+  const wins: NewWin[] = [];
+
+  if (meditation.minutes !== null) {
+    wins.push({
+      type: 'meditation',
+      duration_minutes: meditation.minutes,
+      completed: meditation.completed,
+    });
+  }
+
+  if (learning.learned.trim()) {
+    const reference = learning.reference.trim();
+    wins.push({
+      type: 'learning',
+      learned_text: learning.learned.trim(),
+      ...(reference ? { reference_source: reference } : {}),
+      ...(learning.photos.length > 0 ? { media: learning.photos } : {}),
+    });
+  }
+
+  if (movement.activity) {
+    wins.push({
+      type: 'movement',
+      movement_type: toMovementType(movement.activity, movement.otherActivity),
+      ...(movement.photos.length > 0 ? { media: movement.photos } : {}),
+    });
+  }
+
+  return wins;
+}
+
+/**
+ * The words that go out with the post.
+ *
+ * Just the caption. A typed "Others" activity used to be pinned to the front of
+ * it, because `movement_type` was taken to be a closed enum that would swallow
+ * it — it is free text, so it now goes out as the movement type itself and has
+ * no business rewriting what someone wrote.
+ */
+export function buildCaption(draft: EntryDraft) {
+  return draft.caption.trim();
+}
 
 type EntryDraftValue = {
   draft: EntryDraft;
   patchMeditation: (patch: Partial<MeditationDraft>) => void;
   patchLearning: (patch: Partial<LearningDraft>) => void;
   patchMovement: (patch: Partial<MovementDraft>) => void;
-  /** Hand the finished entry to the backend. A no-op until the endpoint exists. */
-  submit: () => Promise<void>;
+  setCaption: (caption: string) => void;
+  /**
+   * Create the post, clear the draft, and hand back what the server stored so
+   * the caller can put it straight into the feed. Throws so Review can report.
+   */
+  submit: () => Promise<Post>;
 };
 
 const EntryDraftContext = createContext<EntryDraftValue | null>(null);
 
 export function EntryDraftProvider({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState<EntryDraft>(EMPTY);
+  const { token } = useAuth();
 
   const value = useMemo<EntryDraftValue>(
     () => ({
@@ -62,11 +150,23 @@ export function EntryDraftProvider({ children }: { children: ReactNode }) {
         setDraft((d) => ({ ...d, meditation: { ...d.meditation, ...patch } })),
       patchLearning: (patch) => setDraft((d) => ({ ...d, learning: { ...d.learning, ...patch } })),
       patchMovement: (patch) => setDraft((d) => ({ ...d, movement: { ...d.movement, ...patch } })),
+      setCaption: (caption) => setDraft((d) => ({ ...d, caption })),
       submit: async () => {
-        // TODO: POST `draft` to the entries endpoint once it exists, then reset.
+        if (!token) throw new Error('You need to be signed in to share a win.');
+
+        const wins = buildWins(draft);
+        if (wins.length === 0) throw new Error('Add something to share first.');
+
+        const caption = buildCaption(draft);
+        // One request carrying every win, so the three pillars land as a single
+        // moment in the feed and cannot half-succeed.
+        const post = await createPost({ wins, ...(caption ? { caption } : {}) }, token);
+
+        setDraft(EMPTY);
+        return post;
       },
     }),
-    [draft]
+    [draft, token]
   );
 
   return <EntryDraftContext.Provider value={value}>{children}</EntryDraftContext.Provider>;
@@ -78,6 +178,6 @@ export function useEntryDraft() {
   return context;
 }
 
-/** The three pillars, in flow order — used by the shared progress header. */
+/** The three pillars, in flow order — used by the shared step indicator. */
 export const PILLAR_ORDER = ['meditation', 'learning', 'movement'] as const;
 export type Pillar = (typeof PILLAR_ORDER)[number];

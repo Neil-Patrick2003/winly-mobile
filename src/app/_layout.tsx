@@ -1,13 +1,17 @@
 import '@/global.css';
 
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { Platform, useColorScheme } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { Platform } from 'react-native';
+import { ScopedTheme } from 'uniwind';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { Colors } from '@/constants/theme';
 import { useBrandFonts } from '@/hooks/use-brand-fonts';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
+import { FeedProvider } from '@/lib/feed-context';
+import { ToastProvider } from '@/lib/toast';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -38,20 +42,16 @@ const LightTheme = {
   },
 };
 
-const NightTheme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    primary: Colors.dark.primary,
-    background: Colors.dark.background,
-    card: Colors.dark.backgroundElement,
-    text: Colors.dark.text,
-    border: Colors.dark.border,
-  },
-};
-
+/**
+ * The app is light-only, pinned here rather than screen by screen: `ThemeProvider`
+ * covers the navigator's own chrome, `ScopedTheme` covers the uniwind class
+ * tokens (`bg-surface`, `text-ink`, …), and `useColorScheme` reports light to
+ * everything else. See `hooks/use-color-scheme.ts` for how to undo it.
+ *
+ * The status bar is set once here too — it sits above the navigator, so a
+ * screen would have to fight it rather than merely restate it.
+ */
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
   const fontsReady = useBrandFonts();
 
   // Keep the native splash up until the brand faces are registered, so text
@@ -59,11 +59,22 @@ export default function RootLayout() {
   if (!fontsReady) return null;
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? NightTheme : LightTheme}>
-      <AuthProvider>
-        <AnimatedSplashOverlay />
-        <RootNavigator />
-      </AuthProvider>
+    <ThemeProvider value={LightTheme}>
+      <ScopedTheme theme="light">
+        <StatusBar style="dark" />
+        <AuthProvider>
+          {/* Above the navigator, so a confirmation outlives the screen that
+              raised it — sharing a win dismisses the entry modal. */}
+          <ToastProvider>
+            {/* Above the navigator too, so sharing a win can drop the created
+                post straight into the feed the tabs are showing. */}
+            <FeedProvider>
+              <AnimatedSplashOverlay />
+              <RootNavigator />
+            </FeedProvider>
+          </ToastProvider>
+        </AuthProvider>
+      </ScopedTheme>
     </ThemeProvider>
   );
 }
@@ -84,13 +95,14 @@ function RootNavigator() {
       <Stack.Screen name="register" options={SWAP} />
       <Stack.Screen name="login" options={SWAP} />
       <Stack.Screen name="settings" />
+      <Stack.Screen name="messages" />
       {/* Entering the app is a context change, not a push — and the swipe-back
           gesture is disabled so you cannot slide back into the auth flow. */}
       <Stack.Screen
         name="(tabs)"
         options={{ animation: 'fade', animationDuration: 300, gestureEnabled: false }}
       />
-      {/* The ESC entry flow presents over the tabs — full screen, its own top
+      {/* The Share-a-win flow presents over the tabs — full screen, its own top
           bar, dismissed by the flow's close control. */}
       <Stack.Screen name="entry" options={{ presentation: 'modal' }} />
     </Stack>

@@ -29,6 +29,11 @@ type AuthContextValue = {
   register: (input: RegisterInput) => Promise<void>;
   login: (input: LoginInput) => Promise<void>;
   logout: () => Promise<void>;
+  /**
+   * Re-read the user. Counters live on that record — `wins_count`, `streak_days`
+   * — so anything that moves them has to ask for it again.
+   */
+  refreshUser: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -88,6 +93,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (input: LoginInput) => adopt(await loginRequest(input)), [adopt]);
 
+  const refreshUser = useCallback(async () => {
+    if (!token) return;
+    try {
+      setUser(await fetchUser(token));
+    } catch {
+      // Only counters are at stake. Failing here should not disturb a session
+      // that is otherwise working, so the stale numbers simply stand.
+    }
+  }, [token]);
+
   const logout = useCallback(async () => {
     try {
       if (token) await logoutRequest(token);
@@ -110,8 +125,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       login,
       logout,
+      refreshUser,
     }),
-    [user, token, isRestoring, register, login, logout]
+    [user, token, isRestoring, register, login, logout, refreshUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

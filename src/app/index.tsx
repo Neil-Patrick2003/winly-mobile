@@ -1,5 +1,4 @@
 import { Link, Redirect } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,9 +8,9 @@ import { Wordmark } from '@/components/wordmark';
 import { useAuth } from '@/lib/auth-context';
 
 /**
- * The welcome illustration is a fixed light artwork, so this screen commits to
- * the light palette rather than following the system scheme — dark-scheme text
- * would disappear against it. That's why there are no `dark:` variants here.
+ * The welcome illustration is a fixed light artwork, and dark-scheme text would
+ * disappear against it. The whole app is pinned light in the root layout, so
+ * that is handled — which is why there are no `dark:` variants here.
  */
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
@@ -23,8 +22,6 @@ export default function WelcomeScreen() {
 
   return (
     <View className="flex-1 bg-surface">
-      <StatusBar style="dark" />
-
       <Image
         source={require('@/assets/images/illustrations/welcome_bg.png')}
         className="absolute inset-0"

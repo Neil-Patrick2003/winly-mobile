@@ -21,8 +21,8 @@ function HeaderAction({
       accessibilityLabel={label}
       onPress={onPress}
       hitSlop={8}
-      className="p-2 active:opacity-60">
-      <SymbolView name={icon} size={22} tintColor={Colors.light.text} />
+      className="h-11 w-11 items-center justify-center rounded-full bg-surface-card active:opacity-60">
+      <SymbolView name={icon} size={20} tintColor={Colors.light.text} />
     </Pressable>
   );
 }
@@ -36,9 +36,9 @@ export function AppHeader() {
   const insets = useSafeAreaInsets();
 
   return (
-    <View
-      className="border-b border-hairline bg-surface-card px-4 pb-2"
-      style={{ paddingTop: insets.top + 6 }}>
+    // No divider and no card fill: the header floats on the page background so
+    // the white action buttons and the cards below read as the raised layer.
+    <View className="bg-surface px-4 pb-2" style={{ paddingTop: insets.top + 6 }}>
       <View className="w-full max-w-[800px] flex-row items-center justify-between self-center">
         <View className="flex-row items-center gap-2">
           <Image
@@ -56,16 +56,18 @@ export function AppHeader() {
           <Text className="font-logo-extrabold text-2xl leading-8 text-ink">Winly</Text>
         </View>
 
-        <View className="flex-row items-center">
+        {/* Settings used to sit here; it moved to the Profile tab when the
+            design gave the second slot to messages. */}
+        <View className="flex-row items-center gap-2.5">
           <HeaderAction
             icon={{ ios: 'bell', android: 'notifications', web: 'notifications' }}
             label="Notifications"
             onPress={() => router.push('/notifications')}
           />
           <HeaderAction
-            icon={{ ios: 'gearshape', android: 'settings', web: 'settings' }}
-            label="Settings"
-            onPress={() => router.push('/settings')}
+            icon={{ ios: 'bubble.left', android: 'chat_bubble_outline', web: 'chat_bubble_outline' }}
+            label="Messages"
+            onPress={() => router.push('/messages')}
           />
         </View>
       </View>

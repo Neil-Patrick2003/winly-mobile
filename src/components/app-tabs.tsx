@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { Tabs, TabList, TabSlot, TabTrigger, type TabTriggerSlotProps } from 'expo-router/ui';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { Pressable, Text, View, type ViewProps } from 'react-native';
@@ -77,14 +78,18 @@ function TabButton({
 /**
  * Create. A rounded square rather than an icon, so it reads as an action, but
  * captioned like the rest so the row of labels stays level.
+ *
+ * Not a `TabTrigger`: there is no Create tab to select — this opens the Share
+ * flow as a modal over whichever tab you were on, and returns you to it. A
+ * plain child of `TabList` is ignored by expo-router's trigger parsing, so it
+ * renders in the row without registering a route.
  */
-function CreateButton({ isFocused, ...props }: TabTriggerSlotProps) {
+function CreateButton() {
   return (
     <Pressable
-      {...props}
       accessibilityRole="button"
-      accessibilityState={{ selected: isFocused }}
-      accessibilityLabel="Create"
+      accessibilityLabel="Share a small win"
+      onPress={() => router.push('/entry')}
       className="px-2 active:opacity-60">
       <View className="flex-col items-center">
         <View className="h-7 w-7 items-center justify-center rounded-lg bg-gray-100">
@@ -92,10 +97,10 @@ function CreateButton({ isFocused, ...props }: TabTriggerSlotProps) {
             name={{ ios: 'plus', android: 'add', web: 'add' }}
             size={18}
             weight="semibold"
-            tintColor={isFocused ? Colors.light.primary : Colors.light.text}
+            tintColor={Colors.light.text}
           />
         </View>
-        <TabLabel isFocused={isFocused}>Create</TabLabel>
+        <TabLabel>Create</TabLabel>
       </View>
     </Pressable>
   );
@@ -123,9 +128,7 @@ export default function AppTabs() {
             />
           </TabTrigger>
 
-          <TabTrigger name="create" href="/create" asChild>
-            <CreateButton />
-          </TabTrigger>
+          <CreateButton />
 
           <TabTrigger name="notifications" href="/notifications" asChild>
             <TabButton

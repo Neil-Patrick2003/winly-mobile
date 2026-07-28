@@ -1,85 +1,82 @@
 import { router } from 'expo-router';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 
-import { EntryProgress } from '@/components/entry-progress';
+import {
+  EntryHeader,
+  PillarHeading,
+  SkipLink,
+  StepFooter,
+  StepIndicator,
+} from '@/components/entry-chrome';
 import { Field } from '@/components/ui/field';
 import { MediaPicker } from '@/components/ui/media-picker';
 import { TextArea } from '@/components/ui/text-area';
 import { useEntryDraft } from '@/lib/entry-draft';
 
-const PRIMARY_BUTTON =
-  'items-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500 py-3.5 active:opacity-85';
-
 /**
- * Learning pillar: what you read or figured out, an optional source link, a
- * reflection, and photos. Every field is optional — Continue is always live, so
- * a light day can pass straight through to Movement.
+ * Step 2. One thing learned, where it came from, and anything worth keeping a
+ * picture of. Every field is optional — Next is always live.
  */
-export default function LearningScreen() {
-  const insets = useSafeAreaInsets();
+export default function LearningStepScreen() {
   const { draft, patchLearning } = useEntryDraft();
-  const { title, link, reflection, photos } = draft.learning;
+  const { learned, reference, photos } = draft.learning;
+
+  // The reference and the photos are extras; the thing learned is the step, so
+  // it alone decides both completion and whether the flow can move on.
+  const hasInput = learned.trim().length > 0;
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-surface"
+      className="flex-1 bg-surface-card"
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <EntryProgress active="learning" onBack={() => router.back()} />
+      <EntryHeader />
 
       <ScrollView
         contentContainerClassName="w-full max-w-[800px] self-center px-6"
-        contentContainerStyle={{ paddingTop: 20, paddingBottom: insets.bottom + 24 }}
+        contentContainerStyle={{ paddingTop: 20, paddingBottom: 24 }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag">
-        <View className="gap-1">
-          <Text className="font-heading-bold text-2xl leading-8 text-ink">
-            What did you learn?
-          </Text>
-          <Text className="font-sans text-[15px] leading-[22px] text-ink-muted">
-            Something you read or figured out today. All optional.
-          </Text>
+        <StepIndicator active="learning" />
+
+        <View className="pt-7">
+          <PillarHeading pillar="learning" subtitle="Share something you learned today" />
         </View>
 
         <View className="gap-3 pt-5">
-          <Field
-            icon={{ ios: 'book', android: 'menu_book', web: 'menu_book' }}
-            placeholder="Title"
-            value={title}
-            onChangeText={(t) => patchLearning({ title: t })}
-            maxLength={120}
-          />
-          <Field
-            icon={{ ios: 'link', android: 'link', web: 'link' }}
-            placeholder="Reference link (optional)"
-            value={link}
-            onChangeText={(t) => patchLearning({ link: t })}
-            autoCapitalize="none"
-            keyboardType="url"
-            maxLength={500}
-          />
           <TextArea
-            placeholder="Your reflection — what stuck with you?"
-            value={reflection}
-            onChangeText={(t) => patchLearning({ reflection: t })}
+            placeholder="What did you learn today?"
+            value={learned}
+            // Writing something *is* completing the step — there is nothing a
+            // separate confirmation would add, and emptying the box undoes it.
+            onChangeText={(t) => patchLearning({ learned: t, completed: t.trim().length > 0 })}
+            className="min-h-28 rounded-2xl border border-hairline bg-surface px-4 py-3.5 font-sans text-[15px] text-ink"
             maxLength={1000}
           />
+          {/* Deliberately not a URL field — "that podcast on the drive home" is
+              as valid a source as a link. */}
+          <Field
+            placeholder="Reference or source (optional) — book, article, video"
+            value={reference}
+            onChangeText={(t) => patchLearning({ reference: t })}
+            maxLength={500}
+          />
           <MediaPicker
-            uris={photos}
+            files={photos}
             onChange={(next) => patchLearning({ photos: next })}
-            label="Add photos"
+            label="Attach a photo (notes, screenshot)"
           />
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push('/entry/movement')}
-          className={`mt-8 ${PRIMARY_BUTTON}`}>
-          <Text className="font-body-semibold text-base leading-6 text-white">
-            Continue to Movement
-          </Text>
-        </Pressable>
+        <View className="pt-5">
+          <SkipLink pillar="learning" onPress={() => router.push('/entry/movement')} />
+        </View>
       </ScrollView>
+
+      <StepFooter
+        onBack={() => router.back()}
+        onNext={() => router.push('/entry/movement')}
+        nextDisabled={!hasInput}
+      />
     </KeyboardAvoidingView>
   );
 }

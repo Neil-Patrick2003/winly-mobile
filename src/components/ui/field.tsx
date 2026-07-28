@@ -4,7 +4,8 @@ import { Pressable, TextInput, type TextInputProps, View } from 'react-native';
 import { useResolveClassNames } from 'uniwind';
 
 export type FieldProps = {
-  icon: SymbolViewProps['name'];
+  /** Omit for a plain pill with no leading glyph. */
+  icon?: SymbolViewProps['name'];
   invalid?: boolean;
 } & TextInputProps;
 
@@ -31,7 +32,7 @@ export function Field({ icon, invalid, placeholder, secureTextEntry, ...inputPro
       className={`flex-row items-center gap-3 rounded-2xl border bg-surface-card px-4 py-2.5 ${
         invalid ? 'border-highlight' : 'border-hairline'
       }`}>
-      <SymbolView name={icon} size={16} tintColor={muted} />
+      {icon ? <SymbolView name={icon} size={16} tintColor={muted} /> : null}
       <TextInput
         className="flex-1 font-sans text-[15px] text-ink"
         placeholder={placeholder}

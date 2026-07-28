@@ -3,12 +3,16 @@ import * as Device from 'expo-device';
 import { apiGet, apiPost } from '@/lib/api';
 
 export type User = {
-  id: number;
-  name: string;
+  /** A UUID, not a sequential integer — never do arithmetic or ordering on it. */
+  id: string;
+  full_name: string;
   username: string;
   email: string;
-  avatar: string | null;
-  cover_photo: string | null;
+  avatar_url: string | null;
+  /** Named gradient preset ("sunrise", …) rather than an uploaded image. */
+  cover_gradient: string;
+  streak_days: number;
+  wins_count: number;
   bio: string | null;
   is_private: boolean;
   /** Null until the emailed verification link is followed. Informational only —
@@ -26,7 +30,7 @@ export function getDeviceName() {
 }
 
 export type RegisterInput = {
-  name: string;
+  fullName: string;
   username: string;
   email: string;
   password: string;
@@ -38,10 +42,13 @@ export type RegisterInput = {
  *
  * The server trims and lowercases the username itself; doing it here too means
  * what the user sees validated is what actually gets stored.
+ *
+ * The display name goes over the wire as `full_name`, which is also the key its
+ * 422 messages come back under.
  */
 export function registerRequest(input: RegisterInput) {
   return apiPost<AuthResponse>('/api/v1/register', {
-    name: input.name.trim(),
+    full_name: input.fullName.trim(),
     username: input.username.trim().toLowerCase(),
     email: input.email.trim(),
     password: input.password,

@@ -35,10 +35,28 @@ export class ApiError extends Error {
   }
 }
 
-/** Thrown when the request never reached the server. */
+/**
+ * Thrown when the request never completed at the transport level.
+ *
+ * An upload gets its own wording. A server that caps the request body answers
+ * 413 and closes the connection while the body is still going out, which
+ * surfaces here as a write failure rather than as a readable response — telling
+ * someone to check their connection would send them looking in the wrong place.
+ * The original error is kept as `cause`, since its message is the only thing
+ * that distinguishes a timeout from a refused connection.
+ */
 export class NetworkError extends Error {
-  constructor() {
-    super('Could not reach the server. Check your connection and try again.');
+  constructor(cause?: unknown, upload = false) {
+    const summary = upload
+      ? 'The upload did not go through. The file may be too large, or the connection dropped.'
+      : 'Could not reach the server. Check your connection and try again.';
+
+    // The underlying message is the only thing that separates a timeout from a
+    // refused connection from a reset mid-body, and it is unreadable to anyone
+    // but us — so it rides along in dev builds and nowhere else.
+    const detail = cause instanceof Error ? cause.message : undefined;
+
+    super(__DEV__ && detail ? `${summary}\n\n[dev] ${detail}` : summary, { cause });
     this.name = 'NetworkError';
   }
 }
@@ -52,6 +70,7 @@ function toFieldErrors(errors: Record<string, string[]> | undefined) {
 }
 
 type RequestOptions = {
+  /** A `FormData` body is sent as multipart; anything else is JSON. */
   body?: unknown;
   /** Sanctum personal access token, sent as a bearer credential. */
   token?: string | null;
@@ -62,6 +81,7 @@ async function apiRequest<TResponse>(
   path: string,
   { body, token }: RequestOptions = {}
 ): Promise<TResponse> {
+  const multipart = body instanceof FormData;
   let response: Response;
 
   try {
@@ -71,13 +91,15 @@ async function apiRequest<TResponse>(
         // Without this Laravel answers validation failures with a redirect
         // instead of the 422 JSON body.
         Accept: 'application/json',
-        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        // Deliberately absent for multipart: fetch has to generate the boundary
+        // itself, and setting the header by hand breaks parsing entirely.
+        ...(body === undefined || multipart ? {} : { 'Content-Type': 'application/json' }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : multipart ? body : JSON.stringify(body),
     });
-  } catch {
-    throw new NetworkError();
+  } catch (caught) {
+    throw new NetworkError(caught, multipart);
   }
 
   // 204 No Content has no body to parse.
@@ -86,10 +108,26 @@ async function apiRequest<TResponse>(
     return (await response.json().catch(() => undefined)) as TResponse;
   }
 
-  // An error page (HTML) is possible when the server blows up, so parsing the
-  // body must not itself throw.
-  const parsed = await response.json().catch(() => ({}) as LaravelErrorBody);
-  const data = parsed as LaravelErrorBody;
+  // Read as text first and parse defensively. An oversized upload is rejected
+  // by the web server before PHP runs, and answered with an HTML page — calling
+  // `.json()` on that throws.
+  const raw = await response.text().catch(() => '');
+  let data: LaravelErrorBody = {};
+  try {
+    data = JSON.parse(raw) as LaravelErrorBody;
+  } catch {
+    if (response.status === 413) {
+      throw new ApiError(413, 'That file is too large to upload. Try a smaller one.');
+    }
+    throw new ApiError(response.status, 'The server sent something unexpected.');
+  }
+
+  if (response.status === 413) {
+    throw new ApiError(
+      413,
+      data.message ?? 'That file is too large to upload. Try a smaller one.'
+    );
+  }
 
   if (response.status === 429) {
     const header = Number(response.headers.get('Retry-After'));

@@ -6,10 +6,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/theme';
 
 /**
- * Reached from the header. A placeholder — the settings themselves are not
- * built yet, but the route has to exist for the header's typed link to resolve.
+ * Reached from the header. A placeholder — messaging is not built yet, but the
+ * route has to exist for the header's typed link to resolve.
  */
-export default function SettingsScreen() {
+export default function MessagesScreen() {
   const insets = useSafeAreaInsets();
 
   return (
@@ -28,11 +28,11 @@ export default function SettingsScreen() {
               tintColor={Colors.light.text}
             />
           </Pressable>
-          <Text className="font-heading-bold text-xl leading-7 text-ink">Settings</Text>
+          <Text className="font-heading-bold text-xl leading-7 text-ink">Messages</Text>
         </View>
 
         <Text className="pt-6 font-sans text-sm leading-5 text-ink-muted">
-          Account, privacy and notification preferences will live here.
+          Conversations with the people you follow will live here.
         </Text>
       </View>
     </View>

@@ -1,102 +1,123 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { SymbolViewProps } from 'expo-symbols';
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 
-import { EntryProgress, dismissEntryFlow } from '@/components/entry-progress';
-import { Field } from '@/components/ui/field';
+import {
+  EntryHeader,
+  PillarHeading,
+  PILLAR_THEME,
+  SkipLink,
+  StepFooter,
+  StepIndicator,
+} from '@/components/entry-chrome';
+import { Chip } from '@/components/ui/chip';
 import { MediaPicker } from '@/components/ui/media-picker';
 import { TextArea } from '@/components/ui/text-area';
-import { useEntryDraft } from '@/lib/entry-draft';
+import { OTHER_ACTIVITY, useEntryDraft } from '@/lib/entry-draft';
 
-const PRIMARY_BUTTON =
-  'items-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500 py-3.5 active:opacity-85';
+const THEME = PILLAR_THEME.movement;
 
 /**
- * Movement pillar and the end of the flow: title, notes, photos, then Share.
- * Share submits the whole draft (meditation + learning + movement) and dismisses
- * back to the tabs. Submitting is a no-op until the entries endpoint exists.
+ * The shortlist, not an exhaustive taxonomy — "Others" opens a box for whatever
+ * is missing. Labels are the stored value, so renaming one orphans the drafts
+ * that chose it.
  */
-export default function MovementScreen() {
-  const insets = useSafeAreaInsets();
-  const { draft, patchMovement, submit } = useEntryDraft();
-  const { title, notes, photos } = draft.movement;
+const ACTIVITIES: { label: string; icon: SymbolViewProps['name'] }[] = [
+  { label: 'Morning Walk', icon: { ios: 'figure.walk', android: 'directions_walk', web: 'directions_walk' } },
+  { label: 'Run', icon: { ios: 'figure.run', android: 'directions_run', web: 'directions_run' } },
+  { label: 'Yoga', icon: { ios: 'figure.yoga', android: 'self_improvement', web: 'self_improvement' } },
+  { label: 'Gym', icon: { ios: 'dumbbell', android: 'fitness_center', web: 'fitness_center' } },
+  { label: 'Stretching', icon: { ios: 'figure.flexibility', android: 'accessibility_new', web: 'accessibility_new' } },
+  { label: 'Cycling', icon: { ios: 'bicycle', android: 'directions_bike', web: 'directions_bike' } },
+  { label: OTHER_ACTIVITY, icon: { ios: 'ellipsis', android: 'more_horiz', web: 'more_horiz' } },
+];
 
-  const [sharing, setSharing] = useState(false);
+/**
+ * Whether the step counts as answered: a chip, and — since "Others" is not an
+ * answer on its own — the words that go with it. Naming an activity is the same
+ * act as completing the step, so this decides both.
+ */
+function isAnswered(activity: string | null, otherActivity: string) {
+  return activity !== null && (activity !== OTHER_ACTIVITY || otherActivity.trim().length > 0);
+}
 
-  const share = async () => {
-    if (sharing) return;
-    setSharing(true);
-    try {
-      await submit();
-      // Tears down the whole modal flow and returns to the Create tab. Plain
-      // dismissAll would only pop back to Meditation (see dismissEntryFlow).
-      dismissEntryFlow();
-    } catch {
-      setSharing(false);
-      Alert.alert('Could not share', 'Something went wrong. Please try again.');
-    }
-  };
+/** Step 3, and the last one before Review. */
+export default function MovementStepScreen() {
+  const { draft, patchMovement } = useEntryDraft();
+  const { activity, otherActivity, photos } = draft.movement;
+
+  const hasInput = isAnswered(activity, otherActivity);
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-surface"
+      className="flex-1 bg-surface-card"
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <EntryProgress active="movement" onBack={() => router.back()} />
+      <EntryHeader />
 
       <ScrollView
         contentContainerClassName="w-full max-w-[800px] self-center px-6"
-        contentContainerStyle={{ paddingTop: 20, paddingBottom: insets.bottom + 24 }}
+        contentContainerStyle={{ paddingTop: 20, paddingBottom: 24 }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag">
-        <View className="gap-1">
-          <Text className="font-heading-bold text-2xl leading-8 text-ink">How did you move?</Text>
-          <Text className="font-sans text-[15px] leading-[22px] text-ink-muted">
-            A walk, a workout, a stretch. All optional — then share your day.
-          </Text>
+        <StepIndicator active="movement" />
+
+        <View className="pt-7">
+          <PillarHeading pillar="movement" subtitle="What did you do to move your body?" />
         </View>
 
-        <View className="gap-3 pt-5">
-          <Field
-            icon={{ ios: 'figure.walk', android: 'directions_walk', web: 'directions_walk' }}
-            placeholder="Title"
-            value={title}
-            onChangeText={(t) => patchMovement({ title: t })}
-            maxLength={120}
-          />
-          <TextArea
-            placeholder="Notes — what did you do, and how did it feel?"
-            value={notes}
-            onChangeText={(t) => patchMovement({ notes: t })}
-            maxLength={1000}
-          />
+        <View className="flex-row flex-wrap gap-2.5 pt-5">
+          {ACTIVITIES.map((item) => (
+            <Chip
+              key={item.label}
+              label={item.label}
+              icon={item.icon}
+              selected={item.label === activity}
+              accent={THEME.accent}
+              tint={THEME.tint}
+              // Tapping the chosen one again clears it, so a mis-tap is not
+              // permanent — there is no "none of these" chip to fall back to.
+              onPress={() => {
+                const next = item.label === activity ? null : item.label;
+                patchMovement({ activity: next, completed: isAnswered(next, otherActivity) });
+              }}
+            />
+          ))}
+        </View>
+
+        {activity === OTHER_ACTIVITY ? (
+          <View className="pt-3">
+            <TextArea
+              placeholder="What did you do?"
+              value={otherActivity}
+              onChangeText={(t) =>
+                patchMovement({ otherActivity: t, completed: isAnswered(activity, t) })
+              }
+              className="min-h-24 rounded-2xl border border-hairline bg-surface px-4 py-3.5 font-sans text-[15px] text-ink"
+              maxLength={200}
+              autoFocus
+            />
+          </View>
+        ) : null}
+
+        <View className="pt-5">
           <MediaPicker
-            uris={photos}
+            files={photos}
             onChange={(next) => patchMovement({ photos: next })}
-            label="Add photos"
+            label="Attach a photo of your movement"
           />
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ disabled: sharing }}
-          disabled={sharing}
-          onPress={share}
-          className={`mt-8 ${PRIMARY_BUTTON} ${sharing ? 'opacity-60' : ''}`}
-          style={{ boxShadow: '0 8px 20px rgba(34, 197, 94, 0.35)' }}>
-          <Text className="font-body-semibold text-base leading-6 text-white">
-            {sharing ? 'Sharing…' : 'Share your ESC'}
-          </Text>
-        </Pressable>
+        <View className="pt-5">
+          <SkipLink pillar="movement" onPress={() => router.push('/entry/review')} />
+        </View>
       </ScrollView>
+
+      <StepFooter
+        onBack={() => router.back()}
+        onNext={() => router.push('/entry/review')}
+        nextLabel="Review"
+        nextDisabled={!hasInput}
+      />
     </KeyboardAvoidingView>
   );
 }

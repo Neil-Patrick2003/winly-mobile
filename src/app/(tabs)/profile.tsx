@@ -5,7 +5,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HeartDivider } from '@/components/heart';
-import { Image } from '@/components/ui/image';
+import { ImageWithPlaceholder } from '@/components/ui/image';
 import { Wordmark } from '@/components/wordmark';
 import { BottomTabInset, Colors } from '@/constants/theme';
 import { useAuth } from '@/lib/auth-context';
@@ -63,7 +63,7 @@ export default function ProfileScreen() {
     );
   }
 
-  const initial = (user.name.trim()[0] ?? user.username[0] ?? '?').toUpperCase();
+  const initial = (user.full_name.trim()[0] ?? user.username[0] ?? '?').toUpperCase();
   const joined = new Date(user.created_at).toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'long',
@@ -84,21 +84,19 @@ export default function ProfileScreen() {
         </View>
 
         <View className="items-center gap-3 pt-8">
-          {user.avatar ? (
-            <Image
-              source={{ uri: user.avatar }}
-              className="h-20 w-20 rounded-full"
-              contentFit="cover"
-            />
-          ) : (
-            // No avatar yet — fall back to the initial on the brand sweep.
+          <ImageWithPlaceholder
+            source={{ uri: user.avatar_url }}
+            className="h-20 w-20 rounded-full"
+            accessibilityLabel={`${user.full_name} profile photo`}>
+            {/* No avatar, or one that would not load — for a person the initial
+                on the brand sweep beats a generic glyph. */}
             <View className="h-20 w-20 items-center justify-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500">
               <Text className="font-heading-bold text-3xl leading-10 text-white">{initial}</Text>
             </View>
-          )}
+          </ImageWithPlaceholder>
 
           <View className="items-center gap-0.5">
-            <Text className="font-heading-bold text-2xl leading-8 text-ink">{user.name}</Text>
+            <Text className="font-heading-bold text-2xl leading-8 text-ink">{user.full_name}</Text>
             <Text className="font-sans text-sm leading-5 text-ink-muted">@{user.username}</Text>
           </View>
 
@@ -131,6 +129,25 @@ export default function ProfileScreen() {
             </Text>
           </View>
         ) : null}
+
+        {/* Settings lost its header slot to messages, so this is now the only
+            way in. */}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/settings')}
+          className="mt-3 flex-row items-center gap-3 rounded-2xl border border-hairline bg-surface-card px-4 py-3.5 active:opacity-70">
+          <SymbolView
+            name={{ ios: 'gearshape', android: 'settings', web: 'settings' }}
+            size={18}
+            tintColor={Colors.light.textSecondary}
+          />
+          <Text className="flex-1 font-body-semibold text-[15px] leading-5 text-ink">Settings</Text>
+          <SymbolView
+            name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }}
+            size={14}
+            tintColor={Colors.light.textSecondary}
+          />
+        </Pressable>
 
         <Pressable
           accessibilityRole="button"
