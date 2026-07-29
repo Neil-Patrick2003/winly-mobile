@@ -99,6 +99,17 @@ function RootNavigator() {
       {/* Pushed from a feed card's comment count, so it reads as going one
           level into that post rather than as a separate place. */}
       <Stack.Screen name="comments/[postId]" />
+      {/* Stories take the whole screen and are watched, not navigated: the
+          fade keeps the rail from sliding away under them, and composing one
+          is a modal because it is a task you finish or abandon. */}
+      <Stack.Screen
+        name="story/[userId]"
+        options={{ animation: 'fade', animationDuration: 200 }}
+      />
+      <Stack.Screen name="story/new" options={{ presentation: 'modal' }} />
+      {/* Who watched one of yours — a modal over the story it belongs to, so
+          closing it puts you back where the count was tapped. */}
+      <Stack.Screen name="story/viewers/[storyId]" options={{ presentation: 'modal' }} />
       {/* Entering the app is a context change, not a push — and the swipe-back
           gesture is disabled so you cannot slide back into the auth flow. */}
       <Stack.Screen

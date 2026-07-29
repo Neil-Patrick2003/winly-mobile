@@ -95,6 +95,19 @@ export function FeedProvider({ children }: { children: ReactNode }) {
   const cursor = useRef<string | null>(null);
   const atEnd = useRef(false);
   const inFlight = useRef(false);
+  /**
+   * Set when a page fetch fails, and what stops the list from asking again on
+   * its own.
+   *
+   * `onEndReached` is not a one-shot: the list re-fires it for every new content
+   * length, and the footer spinner appearing and disappearing changes the
+   * content length. So a failed page that leaves `atEnd` false spins — fetch,
+   * fail, toggle the spinner, fetch — without anyone scrolling, which on the web
+   * build is immediate because content that does not overflow is always within
+   * the end threshold. Cleared by a refresh, the only retry that is a decision
+   * rather than a side effect.
+   */
+  const failed = useRef(false);
 
   /**
    * Take the follow state the server just reported for a page of authors.
@@ -131,9 +144,10 @@ export function FeedProvider({ children }: { children: ReactNode }) {
   const load = useCallback(
     async (reset: boolean) => {
       if (!token || inFlight.current) return;
-      if (!reset && atEnd.current) return;
+      if (!reset && (atEnd.current || failed.current)) return;
 
       inFlight.current = true;
+      failed.current = false;
       setError(null);
 
       try {
@@ -148,6 +162,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
         setPosts((previous) => (reset ? rows : [...previous, ...rows]));
         applyFollowState(page.data, reset);
       } catch (caught) {
+        failed.current = true;
         setError(caught instanceof Error ? caught.message : 'Could not load the feed.');
       } finally {
         inFlight.current = false;
@@ -170,13 +185,17 @@ export function FeedProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     atEnd.current = false;
+    failed.current = false;
     setRefreshing(true);
     await load(true);
     setRefreshing(false);
   }, [load]);
 
   const loadMore = useCallback(async () => {
-    if (atEnd.current || inFlight.current) return;
+    // Checked here and not only inside `load`, because the spinner this would
+    // otherwise raise and drop is itself what re-fires `onEndReached` — bailing
+    // out after touching it would still spin, just without the requests.
+    if (atEnd.current || inFlight.current || failed.current) return;
     setLoadingMore(true);
     await load(false);
     setLoadingMore(false);

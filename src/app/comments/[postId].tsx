@@ -228,6 +228,9 @@ export default function CommentsScreen() {
   const cursor = useRef<string | null>(null);
   const atEnd = useRef(false);
   const inFlight = useRef(false);
+  // Set when a page fetch fails, and what stops the thread from asking again on
+  // its own — see the same guard in `feed-context.tsx`. Cleared by a refresh.
+  const failed = useRef(false);
 
   // The feed's copy is preferred over a fetched one: it is the row being kept
   // up to date, so a like or a follow made here is already reflected in it.
@@ -261,9 +264,10 @@ export default function CommentsScreen() {
   const load = useCallback(
     async (reset: boolean) => {
       if (!token || !postId || inFlight.current) return;
-      if (!reset && atEnd.current) return;
+      if (!reset && (atEnd.current || failed.current)) return;
 
       inFlight.current = true;
+      failed.current = false;
       setError(null);
 
       try {
@@ -282,6 +286,7 @@ export default function CommentsScreen() {
           return [...previous, ...page.data.filter((item) => !seen.has(item.id))];
         });
       } catch (caught) {
+        failed.current = true;
         setError(caught instanceof Error ? caught.message : 'Could not load the comments.');
       } finally {
         inFlight.current = false;
@@ -326,13 +331,16 @@ export default function CommentsScreen() {
 
   const refresh = async () => {
     atEnd.current = false;
+    failed.current = false;
     setRefreshing(true);
     await load(true);
     setRefreshing(false);
   };
 
   const loadMore = async () => {
-    if (atEnd.current || inFlight.current) return;
+    // Checked here and not only inside `load`, because the spinner this would
+    // otherwise raise and drop is itself what re-fires `onEndReached`.
+    if (atEnd.current || inFlight.current || failed.current) return;
     setLoadingMore(true);
     await load(false);
     setLoadingMore(false);

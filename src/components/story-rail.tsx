@@ -1,14 +1,12 @@
-import * as ImagePicker from 'expo-image-picker';
+import { router, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from 'react-native';
+import { useCallback } from 'react';
+import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
 
 import { ImageWithPlaceholder } from '@/components/ui/image';
 import { Colors } from '@/constants/theme';
 import { useAuth } from '@/lib/auth-context';
-import { formatBytes, isWithinUploadLimit, MAX_UPLOAD_BYTES, shrinkAsset } from '@/lib/media';
-import { createStory, type UserSummary } from '@/lib/stories';
-import { useToast } from '@/lib/toast';
+import { type UserSummary } from '@/lib/stories';
 import { useStoryRail } from '@/lib/use-story-rail';
 
 const BUBBLE = 62;
@@ -35,14 +33,32 @@ function Avatar({ uri, name, size }: { uri: string | null; name: string; size: n
 }
 
 /**
- * An avatar inside the gradient ring that marks a live story.
+ * An avatar inside the ring that marks a live story.
  *
- * The ring is a padded gradient behind the avatar with a surface-coloured gap
+ * The ring is a padded fill behind the avatar with a surface-coloured gap
  * between the two, so it reads as a ring rather than a border.
+ *
+ * Watching does not take the ring away — the story is still there to watch
+ * again, and a bubble that lost its ring would read as nothing to see. It only
+ * loses its colour: bright while something is unwatched, a flat grey once the
+ * run has been seen through. Same shape, same size, so a rail does not reflow
+ * as you work along it.
  */
-function RingedAvatar({ uri, name }: { uri: string | null; name: string }) {
+function RingedAvatar({
+  uri,
+  name,
+  seen,
+}: {
+  uri: string | null;
+  name: string;
+  /** Every story in their run has been watched. */
+  seen: boolean;
+}) {
   return (
-    <View className="rounded-full bg-linear-to-tr from-green-400 via-sky-400 to-violet-400 p-[2.5px]">
+    <View
+      className={`rounded-full p-[2.5px] ${
+        seen ? 'bg-surface-selected' : 'bg-linear-to-tr from-green-400 via-sky-400 to-violet-400'
+      }`}>
       <View className="rounded-full bg-surface p-[2px]">
         <View style={{ width: BUBBLE, height: BUBBLE }}>
           <Avatar uri={uri} name={name} size={BUBBLE} />
@@ -72,28 +88,30 @@ function OwnBubble({
   uri,
   name,
   hasStory,
-  busy,
   accent,
   onPress,
+  onAdd,
 }: {
   uri: string | null;
   name: string;
   hasStory: boolean;
-  busy: boolean;
   accent: string;
+  /** Watch your story, or start one when there is none. */
   onPress: () => void;
+  /** Always adds, whatever is already up. */
+  onAdd: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={hasStory ? 'Your story — add another' : 'Add story'}
-      accessibilityState={{ busy, disabled: busy }}
-      disabled={busy}
+      accessibilityLabel={hasStory ? 'Watch your story' : 'Add story'}
       onPress={onPress}
-      className={`w-[86px] items-center gap-2 active:opacity-70 ${busy ? 'opacity-60' : ''}`}>
+      className="w-[86px] items-center gap-2 active:opacity-70">
       <View>
         {hasStory ? (
-          <RingedAvatar uri={uri} name={name} />
+          // Always bright: your own ring tracks whether you have something up,
+          // not whether you have watched it. You know what you posted.
+          <RingedAvatar uri={uri} name={name} seen={false} />
         ) : (
           <View
             className="items-center justify-center rounded-full border-2 border-dashed"
@@ -107,14 +125,15 @@ function OwnBubble({
           </View>
         )}
 
-        {busy ? (
-          <View className="absolute inset-0 items-center justify-center rounded-full bg-black/35">
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          </View>
-        ) : hasStory ? (
-          // Demoted to a badge once there is a story to show behind it.
-          <View
-            className="absolute bottom-0 right-0 h-6 w-6 items-center justify-center rounded-full border-2 border-surface"
+        {hasStory ? (
+          // Demoted to a badge once there is a story to show behind it, and its
+          // own button: the bubble watches, the badge adds.
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Add to your story"
+            onPress={onAdd}
+            hitSlop={6}
+            className="absolute bottom-0 right-0 h-6 w-6 items-center justify-center rounded-full border-2 border-surface active:opacity-70"
             style={{ backgroundColor: accent }}>
             <SymbolView
               name={{ ios: 'plus', android: 'add', web: 'add' }}
@@ -122,7 +141,7 @@ function OwnBubble({
               weight="bold"
               tintColor="#FFFFFF"
             />
-          </View>
+          </Pressable>
         ) : null}
       </View>
 
@@ -137,9 +156,27 @@ function PersonBubble({ person }: { person: UserSummary }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${name}'s story`}
+      accessibilityLabel={
+        person.has_active_story
+          ? person.has_unseen_story
+            ? `Watch ${name}'s story`
+            : `Watch ${name}'s story again — already seen`
+          : `${name} — no story right now`
+      }
+      onPress={() =>
+        router.push({ pathname: '/story/[userId]', params: { userId: person.id } })
+      }
       className="w-[86px] items-center gap-2 active:opacity-70">
-      <RingedAvatar uri={person.avatar_url} name={name} />
+      {/* The ring is what says there is something to watch, so someone with
+          nothing up gets a plain avatar rather than a promise the viewer
+          cannot keep. */}
+      {person.has_active_story ? (
+        <RingedAvatar uri={person.avatar_url} name={name} seen={!person.has_unseen_story} />
+      ) : (
+        <View style={{ width: RING, height: RING }} className="items-center justify-center">
+          <Avatar uri={person.avatar_url} name={name} size={BUBBLE} />
+        </View>
+      )}
       <Caption>{name.trim().split(' ')[0] || name}</Caption>
     </Pressable>
   );
@@ -154,62 +191,18 @@ function PersonBubble({ person }: { person: UserSummary }) {
  * has no end to reach.
  */
 export function StoryRail({ accent }: { accent: string }) {
-  const { user, token, refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { people, loading, loadingMore, loadMore, refresh } = useStoryRail();
-  const showToast = useToast();
-  const [posting, setPosting] = useState(false);
 
-  const addStory = async () => {
-    if (posting || !token) return;
-
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert(
-        'Photo access needed',
-        'Enable photo access for Winly in Settings to post a story.'
-      );
-      return;
-    }
-
-    // Photos only: the stories table records no file kind, so the server has no
-    // way to tell a client to play rather than display, and answers a video 422.
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: false,
-      quality: 0.8,
-    });
-
-    const asset = result.canceled ? null : result.assets[0];
-    if (!asset) return;
-
-    setPosting(true);
-    try {
-      const file = await shrinkAsset(asset);
-
-      if (!isWithinUploadLimit(file)) {
-        Alert.alert(
-          'That photo is too large',
-          `Stories are capped at ${formatBytes(MAX_UPLOAD_BYTES)}. Try a smaller one.`
-        );
-        return;
-      }
-
-      await createStory(file, '', token);
-
-      // `has_active_story` is on the user record and the bubble reads it, so
-      // the record has to be re-read before the rail will show the change.
-      await refreshUser();
-      await refresh();
-      showToast('Story posted 🌱');
-    } catch (caught) {
-      Alert.alert(
-        'Could not post your story',
-        caught instanceof Error ? caught.message : 'Something went wrong. Please try again.'
-      );
-    } finally {
-      setPosting(false);
-    }
-  };
+  // Posting and watching both happen on screens pushed over this one, and both
+  // change what the rail should draw — a new story of your own, or a ring that
+  // has been watched through. Coming back is the moment to find out.
+  useFocusEffect(
+    useCallback(() => {
+      void refreshUser();
+      void refresh();
+    }, [refreshUser, refresh])
+  );
 
   return (
     <FlatList
@@ -229,9 +222,16 @@ export function StoryRail({ accent }: { accent: string }) {
           uri={user?.avatar_url ?? null}
           name={user?.full_name ?? 'You'}
           hasStory={user?.has_active_story ?? false}
-          busy={posting}
           accent={accent}
-          onPress={addStory}
+          // With a story to show, the bubble watches it and the badge adds
+          // another — the split Messenger and Instagram both use. With none,
+          // the whole thing is an add button.
+          onPress={() =>
+            user?.has_active_story
+              ? router.push({ pathname: '/story/[userId]', params: { userId: user.id } })
+              : router.push('/story/new')
+          }
+          onAdd={() => router.push('/story/new')}
         />
       }
       ListFooterComponent={

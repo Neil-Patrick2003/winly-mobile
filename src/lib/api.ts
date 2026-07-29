@@ -91,6 +91,13 @@ async function apiRequest<TResponse>(
         // Without this Laravel answers validation failures with a redirect
         // instead of the 422 JSON body.
         Accept: 'application/json',
+        // Inert against a normal server, and the difference between a working
+        // web build and a broken one when EXPO_PUBLIC_API_URL is an ngrok free
+        // tunnel: ngrok answers browser user-agents with an HTML interstitial
+        // instead of proxying. It does this on GET but not POST, so without
+        // this sign-in appears to work and every read after it comes back as a
+        // 200 full of HTML.
+        'ngrok-skip-browser-warning': 'true',
         // Deliberately absent for multipart: fetch has to generate the boundary
         // itself, and setting the header by hand breaks parsing entirely.
         ...(body === undefined || multipart ? {} : { 'Content-Type': 'application/json' }),
@@ -102,10 +109,25 @@ async function apiRequest<TResponse>(
     throw new NetworkError(caught, multipart);
   }
 
-  // 204 No Content has no body to parse.
   if (response.ok) {
+    // 204 No Content has no body to parse.
     if (response.status === 204) return undefined as TResponse;
-    return (await response.json().catch(() => undefined)) as TResponse;
+
+    const payload = await response.text().catch(() => '');
+    // An empty 200 is a legitimate "nothing to say" — not every endpoint that
+    // returns nothing bothers to say 204 about it.
+    if (!payload) return undefined as TResponse;
+
+    try {
+      return JSON.parse(payload) as TResponse;
+    } catch {
+      // A 200 carrying something that is not JSON is not this API answering at
+      // all — it is a proxy, a tunnel interstitial or a captive portal sitting
+      // in front of it. Letting that become `undefined` only defers the failure
+      // to whichever caller first reads a field off it, where it surfaces as an
+      // unreadable TypeError far from the cause.
+      throw new ApiError(response.status, 'The server sent something unexpected.');
+    }
   }
 
   // Read as text first and parse defensively. An oversized upload is rejected

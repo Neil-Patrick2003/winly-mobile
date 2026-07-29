@@ -33,13 +33,25 @@ export function useStoryRail() {
   const cursor = useRef<string | null>(null);
   const atEnd = useRef(false);
   const inFlight = useRef(false);
+  /**
+   * Set when a page fetch fails, and what stops the rail from asking again on
+   * its own. See the same guard in `feed-context.tsx` for why it is needed:
+   * `onEndReached` re-fires for every new content length, and the footer spinner
+   * changes the content length, so a failure that leaves `atEnd` false loops.
+   *
+   * The rail is the more exposed of the two, because it never overflows — one
+   * bubble and a header are always within the end threshold, so it does not even
+   * need a short feed to start.
+   */
+  const failed = useRef(false);
 
   const load = useCallback(
     async (reset: boolean) => {
       if (!token || !userId || inFlight.current) return;
-      if (!reset && atEnd.current) return;
+      if (!reset && (atEnd.current || failed.current)) return;
 
       inFlight.current = true;
+      failed.current = false;
 
       try {
         let next = reset ? undefined : (cursor.current ?? undefined);
@@ -70,6 +82,7 @@ export function useStoryRail() {
         // The rail is decoration around a feed that stands on its own. A story
         // list that will not load should not put an error where the greeting
         // is; it simply stays empty.
+        failed.current = true;
       } finally {
         inFlight.current = false;
       }
@@ -90,7 +103,9 @@ export function useStoryRail() {
   }, [load]);
 
   const loadMore = useCallback(async () => {
-    if (atEnd.current || inFlight.current) return;
+    // Checked here and not only inside `load`, because the spinner this would
+    // otherwise raise and drop is itself what re-fires `onEndReached`.
+    if (atEnd.current || inFlight.current || failed.current) return;
     setLoadingMore(true);
     await load(false);
     setLoadingMore(false);
@@ -98,9 +113,13 @@ export function useStoryRail() {
 
   const refresh = useCallback(async () => {
     atEnd.current = false;
+    failed.current = false;
     cursor.current = null;
     await load(true);
   }, [load]);
 
-  return { people, loading, loadingMore, hasMore: !atEnd.current, loadMore, refresh };
+  // No `hasMore`: the rail has no end-of-list message to earn one, and reading
+  // `atEnd` here would be reading a ref during render — a value that changes
+  // without scheduling the re-render that would show it.
+  return { people, loading, loadingMore, loadMore, refresh };
 }
