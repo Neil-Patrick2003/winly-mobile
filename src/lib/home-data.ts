@@ -9,5 +9,5 @@
  * come from `useAuth` and from the week endpoint, which have them today.
  */
 
-export const FEED_TABS = ['For You', 'Following', 'Communities'] as const;
+export const FEED_TABS = ['For You', 'Following', 'Circles'] as const;
 export type FeedTab = (typeof FEED_TABS)[number];

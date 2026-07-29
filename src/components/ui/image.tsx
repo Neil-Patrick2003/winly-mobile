@@ -30,6 +30,7 @@ type PlaceholderSource = { uri?: string | null } | number | null;
 export function ImageWithPlaceholder({
   source,
   className,
+  size,
   contentFit = 'cover',
   icon = { ios: 'photo', android: 'image', web: 'image' },
   iconSize = 22,
@@ -39,6 +40,17 @@ export function ImageWithPlaceholder({
 }: {
   source: PlaceholderSource;
   className?: string;
+  /**
+   * A square box, in points, for the image and its stand-in alike.
+   *
+   * Worth having as its own prop because the two branches are different
+   * elements: the stand-in is a `View` whose child can carry its own size, and
+   * the image is an `expo-image` that has none of its own. Sizing only the
+   * stand-in — easy to do by accident — leaves anybody who actually has a photo
+   * rendering at zero height, which reads as a missing image rather than a
+   * missing style.
+   */
+  size?: number;
   contentFit?: 'cover' | 'contain';
   icon?: SymbolViewProps['name'];
   iconSize?: number;
@@ -70,7 +82,8 @@ export function ImageWithPlaceholder({
         // needs a panel to sit on.
         className={`items-center justify-center ${children ? '' : 'bg-surface-selected'} ${
           className ?? ''
-        }`}>
+        }`}
+        style={size === undefined ? undefined : { width: size, height: size }}>
         {children ?? (
           <SymbolView name={icon} size={iconSize} tintColor={Colors.light.textSecondary} />
         )}
@@ -82,6 +95,7 @@ export function ImageWithPlaceholder({
     <Image
       source={typeof source === 'number' ? source : { uri: uri!, headers: mediaHeaders(uri) }}
       className={className}
+      style={size === undefined ? undefined : { width: size, height: size }}
       contentFit={contentFit}
       accessibilityLabel={accessibilityLabel}
       onLoad={onLoad}

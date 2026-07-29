@@ -444,16 +444,45 @@ export function PostCard({ post, variant = 'feed' }: { post: Post; variant?: 'fe
   const detail = variant === 'detail';
   const { author, wins } = post;
   const { user, token } = useAuth();
-  const { followedIds, setFollowed, savedPostIds, toggleSaved, applyLike, adjustComments } =
-    useFeed();
+  const {
+    followedIds,
+    setFollowed,
+    savedPostIds,
+    toggleSaved,
+    applyLike,
+    adjustComments,
+    postState,
+    composingPostId,
+    setComposingPost,
+  } = useFeed();
   const showToast = useToast();
   const theme = useTheme();
 
-  // The box under this card, opened by the comment button. Closed by default:
-  // most of the feed is read, not replied to.
-  const [composing, setComposing] = useState(false);
+  /*
+   * The box under this card, opened by the comment button. Closed by default:
+   * most of the feed is read, not replied to.
+   *
+   * Which card is open is shared rather than kept per card, so opening one
+   * closes any other. The draft stays local, so a half-written reply survives
+   * being set aside and is still there on coming back to it.
+   */
+  const composing = composingPostId === post.id;
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+
+  /*
+   * The counters as drawn: what this reader has done to the post, falling back
+   * to what the list it came from reported.
+   *
+   * Read through the override rather than straight off the prop, because the
+   * prop only moves for posts in the feed's own list. On a circle's wall the
+   * list belongs to that screen, so a like fired the request and then sat
+   * there looking as though nothing had happened.
+   */
+  const interaction = postState[post.id];
+  const liked = interaction?.viewer_has_liked ?? post.viewer_has_liked;
+  const likes = interaction?.likes_count ?? post.likes_count;
+  const comments = interaction?.comments_count ?? post.comments_count;
 
   const sendComment = async () => {
     const text = draft.trim();
@@ -464,9 +493,9 @@ export function PostCard({ post, variant = 'feed' }: { post: Post; variant?: 'fe
       await createComment(post.id, text, token);
       // The endpoint answers with the comment and says nothing about the total,
       // so the count is ours to move.
-      adjustComments(post.id, { by: 1 });
+      adjustComments(post.id, { to: comments + 1 });
       setDraft('');
-      setComposing(false);
+      setComposingPost(null);
       showToast('Comment added');
     } catch (caught) {
       // The box stays open holding what was typed — the one thing worse than
@@ -488,18 +517,18 @@ export function PostCard({ post, variant = 'feed' }: { post: Post; variant?: 'fe
   // and only the newest response is allowed to write back. An older reply
   // arriving late would otherwise undo the newer tap.
   const likeRequest = useRef(0);
+
   const canSend = draft.trim().length > 0 && !sending;
 
   const onLike = async () => {
     if (!token) return;
 
-    const next = !post.viewer_has_liked;
-    const { likes_count, viewer_has_liked } = post;
+    const next = !liked;
     const ticket = ++likeRequest.current;
 
     applyLike(post.id, {
       viewer_has_liked: next,
-      likes_count: likes_count + (next ? 1 : -1),
+      likes_count: likes + (next ? 1 : -1),
     });
 
     try {
@@ -509,10 +538,24 @@ export function PostCard({ post, variant = 'feed' }: { post: Post; variant?: 'fe
       if (likeRequest.current === ticket) applyLike(post.id, state);
     } catch (caught) {
       if (likeRequest.current !== ticket) return;
-      applyLike(post.id, { likes_count, viewer_has_liked });
+      applyLike(post.id, { likes_count: likes, viewer_has_liked: liked });
       showToast(caught instanceof Error ? caught.message : 'That did not go through.');
     }
   };
+
+  /**
+   * How the author is named on a post: the handle, not their full name.
+   *
+   * Falls back to the full name for an account that has not set a username,
+   * since `username` is nullable and a bare "@" would read as a bug.
+   *
+   * Declared above the menu below, which is built while rendering — a `const`
+   * named there before it exists is a crash, not a warning.
+   */
+  const displayName = author.username ?? author.full_name;
+
+  /** Empty on an openly shared post, and on one the endpoint did not look at. */
+  const circles = post.circles ?? [];
 
   const onFollow = async () => {
     if (!token) return;
@@ -522,7 +565,7 @@ export function PostCard({ post, variant = 'feed' }: { post: Post; variant?: 'fe
     // closed, and waiting on a round trip to acknowledge a tap reads as a
     // dropped press.
     setFollowed(author.id, next);
-    showToast(next ? `Following ${author.full_name}` : `Unfollowed ${author.full_name}`);
+    showToast(next ? `Following ${displayName}` : `Unfollowed ${displayName}`);
 
     try {
       const state = await setFollowingRemote(author.id, next, token);
@@ -539,7 +582,7 @@ export function PostCard({ post, variant = 'feed' }: { post: Post; variant?: 'fe
       ? []
       : [
           {
-            label: following ? `Unfollow ${author.full_name}` : `Follow ${author.full_name}`,
+            label: following ? `Unfollow ${displayName}` : `Follow ${displayName}`,
             icon: following ? UNFOLLOW_ICON : FOLLOW_ICON,
             onPress: () => void onFollow(),
           },
@@ -566,14 +609,16 @@ export function PostCard({ post, variant = 'feed' }: { post: Post; variant?: 'fe
 
   return (
     <View
-      className={
-        detail
-          ? // Flush with the screen, not floating on it: on its own screen the
-            // post is the page, and a rounded card inside a card is chrome
-            // wrapped around chrome.
-            'border-b border-hairline bg-surface-card px-4 py-3'
-          : 'mx-4 mt-3 rounded-3xl bg-surface-card p-3.5'
-      }>
+      // Flush with the screen in the feed as well as on its own page: posts
+      // run edge to edge, separated by a hairline rather than floated as
+      // rounded cards on a background. A column of cards puts a frame around
+      // every photo and leaves the photos smaller for it; the point of the
+      // feed is the pictures.
+      //
+      // `px-4` in both, which is what `MediaStack` cancels with `-mx-4` to run
+      // media the full width. The old feed padding of 3.5 was half a step off
+      // that, so photos overhung by two points on each side.
+      className="border-b border-hairline bg-surface-card px-4 py-3">
       <View className="flex-row items-center gap-3">
         {/* The badge overhangs the avatar, so the two share a box rather than
             the badge being positioned against the whole row. */}
@@ -581,7 +626,7 @@ export function PostCard({ post, variant = 'feed' }: { post: Post; variant?: 'fe
           <ImageWithPlaceholder
             source={{ uri: author.avatar_url }}
             className="h-11 w-11 rounded-full"
-            accessibilityLabel={`${author.full_name} profile photo`}>
+            accessibilityLabel={`${displayName} profile photo`}>
             <View className="h-11 w-11 items-center justify-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500">
               <Text className="font-heading-bold text-base leading-6 text-white">
                 {(author.full_name.trim()[0] ?? '?').toUpperCase()}
@@ -592,25 +637,82 @@ export function PostCard({ post, variant = 'feed' }: { post: Post; variant?: 'fe
           {isMine ? null : (
             <FollowBadge
               following={following}
-              name={author.full_name}
+              name={displayName}
               onPress={() => void onFollow()}
             />
           )}
         </View>
 
         <View className="flex-1">
-          <Text numberOfLines={1} className="font-body-semibold text-[15px] leading-5 text-ink">
-            {author.full_name}
-          </Text>
-          <Text numberOfLines={1} className="font-sans text-[13px] leading-[18px] text-ink-muted">
-            {/* `username` is nullable, and a bare "@" would look like a bug. */}
-            {author.username ? `@${author.username} · ` : ''}
-            {timeAgo(post.created_at)}
-          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${displayName}'s profile`}
+            onPress={() =>
+              router.push({ pathname: '/users/[userId]', params: { userId: author.id } })
+            }
+            hitSlop={4}
+            className="self-start active:opacity-60">
+            <Text numberOfLines={1} className="font-body-semibold text-[15px] leading-5 text-ink">
+              {displayName}
+            </Text>
+          </Pressable>
+          {/* The circle sits on the same line as the time rather than under
+              it: it is a detail about where the post came from, not a second
+              subject, and a line of its own gives it more weight than the
+              author's name above.
+
+              It says where the win was placed, not who may read it — circles
+              organise, they do not restrict — and it is the way back in. */}
+          <View className="mt-0.5 flex-row items-center gap-1.5">
+            <Text className="font-sans text-[13px] leading-[18px] text-ink-muted">
+              {timeAgo(post.created_at)}
+            </Text>
+
+            {circles.length > 0 ? (
+              <>
+                <Text className="font-sans text-[13px] leading-[18px] text-ink-muted">·</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    circles.length === 1
+                      ? `Shared in ${circles[0].name}. Open circle.`
+                      : `Shared in ${circles[0].name} and ${circles.length - 1} more. Open circle.`
+                  }
+                  onPress={() =>
+                    router.push({
+                      pathname: '/circles/[circleId]',
+                      params: { circleId: circles[0].id },
+                    })
+                  }
+                  hitSlop={6}
+                  className="shrink flex-row items-center gap-1.5 active:opacity-60">
+                  <View
+                    className="h-3.5 w-3.5 items-center justify-center rounded-[4px]"
+                    style={{ backgroundColor: circles[0].color_hex }}>
+                    <Text className="font-heading-bold text-[8px] leading-[11px] text-white">
+                      {(circles[0].icon_initial.trim()[0] ?? '?').toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text
+                    numberOfLines={1}
+                    className="shrink font-body-semibold text-[13px] leading-[18px] text-ink-muted">
+                    {circles[0].name}
+                  </Text>
+                  {/* Named one and counted the rest: ten chips would bury the
+                      author's own name above them. */}
+                  {circles.length > 1 ? (
+                    <Text className="font-sans text-[13px] leading-[18px] text-ink-muted">
+                      +{circles.length - 1}
+                    </Text>
+                  ) : null}
+                </Pressable>
+              </>
+            ) : null}
+          </View>
         </View>
 
         <MenuButton
-          accessibilityLabel={`More options for ${author.full_name}'s post`}
+          accessibilityLabel={`More options for ${displayName}'s post`}
           items={items}
         />
       </View>
@@ -621,7 +723,7 @@ export function PostCard({ post, variant = 'feed' }: { post: Post; variant?: 'fe
           a card full of them. */}
       <PostBody
         onPress={detail ? undefined : openPost}
-        label={`Open ${author.full_name}'s post`}>
+        label={`Open ${displayName}'s post`}>
         {wins.length > 0 ? (
           <View className="mt-3 flex-row flex-wrap gap-2">
             {wins.map((win) => (
@@ -658,11 +760,11 @@ export function PostCard({ post, variant = 'feed' }: { post: Post; variant?: 'fe
 
       <View className="mt-3.5 flex-row items-center gap-5">
         <Count
-          icon={post.viewer_has_liked ? LIKED_ICON : LIKE_ICON}
-          value={post.likes_count}
+          icon={liked ? LIKED_ICON : LIKE_ICON}
+          value={likes}
           label="likes"
-          actionLabel={post.viewer_has_liked ? 'Unlike' : 'Like'}
-          tint={post.viewer_has_liked ? theme.highlight : undefined}
+          actionLabel={liked ? 'Unlike' : 'Like'}
+          tint={liked ? theme.highlight : undefined}
           onPress={() => void onLike()}
         />
         <Count
@@ -671,14 +773,14 @@ export function PostCard({ post, variant = 'feed' }: { post: Post; variant?: 'fe
             android: 'chat_bubble_outline',
             web: 'chat_bubble_outline',
           }}
-          value={post.comments_count}
+          value={comments}
           label="comments"
           // No way in from the detail: the thread is already below it, and the
           // box down there is the one to write in.
           actionLabel={detail ? undefined : composing ? 'Close the comment box' : 'Comment'}
           // Opens a box on the card rather than a screen. Replying to something
           // in passing should not cost the reader their place in the feed.
-          onPress={detail ? undefined : () => setComposing((open) => !open)}
+          onPress={detail ? undefined : () => setComposingPost(composing ? null : post.id)}
         />
       </View>
 
@@ -692,7 +794,7 @@ export function PostCard({ post, variant = 'feed' }: { post: Post; variant?: 'fe
             placeholder="Write a comment…"
             placeholderTextColor={theme.textSecondary}
             maxLength={COMMENT_MAX}
-            accessibilityLabel={`Write a comment on ${author.full_name}'s post`}
+            accessibilityLabel={`Write a comment on ${displayName}'s post`}
             className="max-h-24 flex-1 rounded-2xl border border-hairline bg-surface px-4 py-2.5 font-sans text-[15px] leading-[22px] text-ink"
           />
           <Pressable

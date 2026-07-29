@@ -96,6 +96,23 @@ function RootNavigator() {
       <Stack.Screen name="login" options={SWAP} />
       <Stack.Screen name="settings" />
       <Stack.Screen name="messages" />
+      {/* Left the tab bar when Circles took the slot, and pushed from the bell
+          in the header instead. */}
+      <Stack.Screen name="notifications" />
+      <Stack.Screen name="admin/meditations" />
+      {/* Editing your own details is a task you finish or abandon. */}
+      <Stack.Screen name="profile/edit" options={{ presentation: 'modal' }} />
+      {/* Somebody else's profile, reached from a post, a member list or a
+          suggestion — a push, because it is one level into who they are. */}
+      <Stack.Screen name="users/[userId]" />
+      <Stack.Screen name="users/[userId]/follows" />
+      {/* A circle and its members read as going one level into the list, so it
+          pushes; starting one is a task you finish or abandon, so it is a
+          modal. */}
+      <Stack.Screen name="circles/[circleId]" />
+      <Stack.Screen name="circles/[circleId]/members" />
+      <Stack.Screen name="circles/[circleId]/invite" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="circles/new" options={{ presentation: 'modal' }} />
       {/* Pushed from a feed card's comment count, so it reads as going one
           level into that post rather than as a separate place. */}
       <Stack.Screen name="comments/[postId]" />

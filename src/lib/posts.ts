@@ -67,6 +67,28 @@ export type Post = LikeCounts & {
   author: PostAuthor;
   /** Always an array — `[]` when the post has none. Ordered as WIN_ORDER. */
   wins: Win[];
+  /**
+   * The circles it was shared into.
+   *
+   * Empty on a post shared openly, which belongs nowhere in particular. When
+   * it is not, only members of at least one of them were served the post — and
+   * they are served it once, however many they share with the author.
+   */
+  circles?: PostCircle[];
+};
+
+/**
+ * The circle a post was shared into, as a feed card needs it.
+ *
+ * Declared here rather than imported from `circles.ts`, which already imports
+ * from this file — and structurally it is a subset of `Circle`, so the fuller
+ * payload the server sends satisfies it.
+ */
+export type PostCircle = {
+  id: string;
+  name: string;
+  icon_initial: string;
+  color_hex: string;
 };
 
 /** Laravel's cursor-paginated envelope. */
@@ -126,6 +148,16 @@ export type CreatePostInput = {
   caption?: string;
   /** At least one — a post with no wins is rejected. */
   wins: NewWin[];
+  /**
+   * The circles to share into, or absent to share with everybody.
+   *
+   * One post reaches all of them — it is not copied per circle, so it keeps one
+   * comment thread and one set of likes however widely it is shared.
+   *
+   * The server only accepts circles the caller is actually in, so this cannot
+   * be used to post into a group you are not part of.
+   */
+  circle_ids?: string[];
 };
 
 export const WIN_LABEL: Record<WinType, string> = {
@@ -266,6 +298,25 @@ export async function createPost(input: CreatePostInput, token: string) {
   );
 
   return response.data;
+}
+
+/**
+ * GET /api/v1/users/{id}/posts — one person's own posts, newest first.
+ *
+ * What a profile shows. Narrowed server-side to what the caller may see, so
+ * somebody else's profile is not a way around a circle's walls — while the
+ * author still sees everything they wrote.
+ */
+export function fetchUserPosts(
+  userId: string,
+  token: string,
+  cursor?: string,
+  perPage = 20
+) {
+  const query = new URLSearchParams({ per_page: String(perPage) });
+  if (cursor) query.set('cursor', cursor);
+
+  return apiGet<Page<Post>>(`/api/v1/users/${userId}/posts?${query.toString()}`, token);
 }
 
 /** Where the caller stands with a user, as the follow endpoints report it. */

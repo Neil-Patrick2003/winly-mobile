@@ -130,11 +130,14 @@ export default function AppTabs() {
 
           <CreateButton />
 
-          <TabTrigger name="notifications" href="/notifications" asChild>
+          {/* Took the slot Alerts held. Notifications did not go anywhere —
+              they are still a tap away on the bell in the header, which is
+              where the design put them. */}
+          <TabTrigger name="circles" href="/circles" asChild>
             <TabButton
-              label="Alerts"
-              icon={{ ios: 'bell', android: 'notifications', web: 'notifications' }}
-              activeIcon={{ ios: 'bell.fill', android: 'notifications', web: 'notifications' }}
+              label="Circles"
+              icon={{ ios: 'person.2', android: 'group', web: 'group' }}
+              activeIcon={{ ios: 'person.2.fill', android: 'group', web: 'group' }}
             />
           </TabTrigger>
 

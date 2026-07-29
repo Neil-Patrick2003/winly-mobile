@@ -1,6 +1,8 @@
-import { createContext, use, useMemo, useState, type ReactNode } from 'react';
+import { useGlobalSearchParams } from 'expo-router';
+import { createContext, use, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { useAuth } from '@/lib/auth-context';
+import { fetchCircles } from '@/lib/circles';
 import { createPost, toMovementType, type LocalFile, type NewWin, type Post } from '@/lib/posts';
 
 /**
@@ -135,7 +137,23 @@ type EntryDraftValue = {
    * the caller can put it straight into the feed. Throws so Review can report.
    */
   submit: () => Promise<Post>;
+  /**
+   * The circles this win is bound for.
+   *
+   * Opened from a circle, that is the one circle. Opened from anywhere else it
+   * is every circle you are in — one post reaching all of them, rather than a
+   * copy per circle. Empty means the open feed only.
+   */
+  targets: { id: string; name: string }[];
+  /**
+   * True when the flow was opened from a particular circle, which is the only
+   * thing that narrows where the win goes. Review says which either way.
+   */
+  lockedToCircle: boolean;
 };
+
+/** The server caps `circle_ids` at 50; one page of circles is plenty under it. */
+const MAX_CIRCLE_TARGETS = 50;
 
 const EntryDraftContext = createContext<EntryDraftValue | null>(null);
 
@@ -143,9 +161,54 @@ export function EntryDraftProvider({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState<EntryDraft>(EMPTY);
   const { token } = useAuth();
 
+  /*
+   * Captured once, on the first render of the flow.
+   *
+   * The circle arrives as a query parameter on `/entry`, and the steps that
+   * follow have URLs of their own that carry nothing — so reading the
+   * parameter on every render would lose the circle the moment somebody
+   * tapped through to Meditation. The initialiser form freezes it for the life
+   * of the flow, which is exactly as long as the draft lives.
+   */
+  const params = useGlobalSearchParams<{ circleId?: string; circleName?: string }>();
+  const [opened] = useState(() =>
+    params.circleId ? { id: params.circleId, name: params.circleName ?? 'this circle' } : null
+  );
+
+  const lockedToCircle = opened !== null;
+  const [mine, setMine] = useState<{ id: string; name: string }[]>([]);
+
+  /*
+   * Every circle the author is in, for the unlocked case.
+   *
+   * Fetched rather than assumed: the win goes to all of them, so the list has
+   * to be the real one at the moment of sharing. A failure leaves it empty,
+   * which shares openly — the safe way to be wrong.
+   */
+  useEffect(() => {
+    if (!token || lockedToCircle) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const page = await fetchCircles(token, undefined, MAX_CIRCLE_TARGETS);
+        if (!cancelled) setMine(page.data.map((circle) => ({ id: circle.id, name: circle.name })));
+      } catch {
+        // Left empty on purpose; see above.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, lockedToCircle]);
+
+  const targets = useMemo(() => (opened ? [opened] : mine), [opened, mine]);
+
   const value = useMemo<EntryDraftValue>(
     () => ({
       draft,
+      targets,
+      lockedToCircle,
       patchMeditation: (patch) =>
         setDraft((d) => ({ ...d, meditation: { ...d.meditation, ...patch } })),
       patchLearning: (patch) => setDraft((d) => ({ ...d, learning: { ...d.learning, ...patch } })),
@@ -160,13 +223,28 @@ export function EntryDraftProvider({ children }: { children: ReactNode }) {
         const caption = buildCaption(draft);
         // One request carrying every win, so the three pillars land as a single
         // moment in the feed and cannot half-succeed.
-        const post = await createPost({ wins, ...(caption ? { caption } : {}) }, token);
+        /*
+         * Every circle it is bound for, in one request: the win is one post
+         * reaching all of them rather than a copy sitting in each. There is no
+         * choice to make here — a win is public and goes to your circles, and
+         * a switch offering otherwise was a decision nobody wanted to take.
+         */
+        const circleIds = targets.map((circle) => circle.id);
+
+        const post = await createPost(
+          {
+            wins,
+            ...(caption ? { caption } : {}),
+            ...(circleIds.length > 0 ? { circle_ids: circleIds } : {}),
+          },
+          token
+        );
 
         setDraft(EMPTY);
         return post;
       },
     }),
-    [draft, token]
+    [draft, token, targets, lockedToCircle]
   );
 
   return <EntryDraftContext.Provider value={value}>{children}</EntryDraftContext.Provider>;

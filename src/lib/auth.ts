@@ -12,7 +12,20 @@ export type User = {
   /** Named gradient preset ("sunrise", …) rather than an uploaded image. */
   cover_gradient: string;
   streak_days: number;
+  /** The best run ever reached, which the profile shows beside the current one. */
+  longest_streak: number;
+  /**
+   * How many times you have posted.
+   *
+   * Not the same as `wins_count`, which counts wins — one post logging all
+   * three pillars moves that by three and this by one.
+   */
+  posts_count: number;
   wins_count: number;
+  followers_count: number;
+  following_count: number;
+  /** Unlocks the admin rows on the profile. */
+  is_admin: boolean;
   /**
    * True while you have a story that has not expired. The story rail reads this
    * to decide whether your bubble is an empty "add" control or your own live

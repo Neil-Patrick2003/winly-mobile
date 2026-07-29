@@ -274,10 +274,15 @@ export default function HomeScreen() {
 
       <WeeklyProgress week={week} loading={weekLoading} error={weekError} />
 
-    {/* The tabs are presentational for now: the feed endpoint takes only
+    {/* The head of the feed's card: the filter sits on top of the posts rather
+        than floating above them, so the whole newsfeed reads as one surface.
+        Rounded at the top only — the list continues it, and the footer closes
+        it off.
+
+        The tabs are presentational for now: the feed endpoint takes only
         `per_page` and `cursor`, with no audience filter, so all three show
         the same posts. */}
-    <View className="mx-4 mt-4 flex-row gap-5 rounded-3xl bg-surface-card px-4">
+    <View className="mx-4 mt-4 flex-row gap-5 rounded-t-3xl bg-surface-card px-4">
       {FEED_TABS.map((item) => {
         const active = item === tab;
         return (
@@ -310,7 +315,16 @@ export default function HomeScreen() {
       <FlatList
         data={posts}
         keyExtractor={(post) => post.id}
-        renderItem={({ item }) => <PostCard post={item} />}
+        // Inside the card the filter opened, not floating on the page: the
+        // post keeps its own padding, and this only supplies the card's edges
+        // and fill. The margin has to live here rather than in `PostCard`,
+        // which is also drawn full-bleed on a circle's wall and on the post's
+        // own screen.
+        renderItem={({ item }) => (
+          <View className="mx-4 bg-surface-card">
+            <PostCard post={item} />
+          </View>
+        )}
         ListHeaderComponent={header}
         showsVerticalScrollIndicator={false}
         // A card can hold an open comment box. Without this the first tap on
@@ -332,11 +346,11 @@ export default function HomeScreen() {
         onEndReachedThreshold={0.6}
         ListEmptyComponent={
           loading ? (
-            <View className="items-center py-12">
+            <View className="mx-4 items-center rounded-b-3xl bg-surface-card py-12">
               <ActivityIndicator size="small" color={Colors.light.textSecondary} />
             </View>
           ) : (
-            <View className="mx-4 mt-3 items-center gap-2 rounded-3xl bg-surface-card px-5 py-10">
+            <View className="mx-4 items-center gap-2 rounded-b-3xl bg-surface-card px-5 py-10">
               <Text className="text-center font-body-semibold text-base leading-6 text-ink">
                 {error ? 'Could not load the feed' : 'Nothing here yet'}
               </Text>
@@ -355,16 +369,25 @@ export default function HomeScreen() {
             </View>
           )
         }
+        // Closes the card off, whatever it has to say — including when it has
+        // nothing, since an unrounded bottom edge would leave the feed looking
+        // cut off rather than finished.
         ListFooterComponent={
-          loadingMore ? (
-            <View className="items-center py-6">
-              <ActivityIndicator size="small" color={Colors.light.textSecondary} />
+          posts.length === 0 ? null : (
+            <View className="mx-4 rounded-b-3xl bg-surface-card">
+              {loadingMore ? (
+                <View className="items-center py-6">
+                  <ActivityIndicator size="small" color={Colors.light.textSecondary} />
+                </View>
+              ) : !hasMore ? (
+                <Text className="py-6 text-center font-sans text-[13px] leading-[18px] text-ink-muted">
+                  You&rsquo;re all caught up
+                </Text>
+              ) : (
+                <View className="h-4" />
+              )}
             </View>
-          ) : posts.length > 0 && !hasMore ? (
-            <Text className="py-6 text-center font-sans text-[13px] leading-[18px] text-ink-muted">
-              You&rsquo;re all caught up
-            </Text>
-          ) : null
+          )
         }
       />
     </View>

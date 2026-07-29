@@ -76,6 +76,35 @@ type FeedValue = {
    * deleting hands back `comments_count`, which is the authority (`to`).
    */
   adjustComments: (postId: string, change: { by: number } | { to: number }) => void;
+  /**
+   * Which post has its comment box open, if any.
+   *
+   * Held here rather than on each card so that only one can be open at a time.
+   * Two boxes at once put two autofocusing inputs on screen fighting over the
+   * keyboard, and left the writer unsure which post they were replying to —
+   * the cards scroll independently of the box that has focus.
+   */
+  /**
+   * Counters as they stand after the reader has acted on a post, keyed by id.
+   *
+   * A post is drawn from whichever list it was fetched into — the feed's, a
+   * circle's wall, its own screen — and only the feed's list lives here. Liking
+   * a post on a circle's wall therefore moved nothing on screen: the card reads
+   * its counts from the prop, and the prop came from a list this context never
+   * touches. These overrides follow the post rather than the list, so a tap
+   * lands wherever the post is being shown.
+   */
+  postState: Readonly<Record<string, PostInteraction>>;
+  composingPostId: string | null;
+  /** Opens one box and closes whatever was open. `null` closes them all. */
+  setComposingPost: (postId: string | null) => void;
+};
+
+/** The counters a reader's own actions have moved. */
+export type PostInteraction = {
+  viewer_has_liked?: boolean;
+  likes_count?: number;
+  comments_count?: number;
 };
 
 const FeedContext = createContext<FeedValue | null>(null);
@@ -91,6 +120,12 @@ export function FeedProvider({ children }: { children: ReactNode }) {
   const [hasMore, setHasMore] = useState(true);
   const [followedIds, setFollowedIds] = useState<ReadonlySet<string>>(() => new Set());
   const [savedPostIds, setSavedPostIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [composingPostId, setComposingPost] = useState<string | null>(null);
+  const [postState, setPostState] = useState<Record<string, PostInteraction>>({});
+
+  const patchPostState = useCallback((postId: string, patch: PostInteraction) => {
+    setPostState((previous) => ({ ...previous, [postId]: { ...previous[postId], ...patch } }));
+  }, []);
 
   const cursor = useRef<string | null>(null);
   const atEnd = useRef(false);
@@ -234,26 +269,51 @@ export function FeedProvider({ children }: { children: ReactNode }) {
           : post
       )
     );
+    patchPostState(postId, {
+      viewer_has_liked: counts.viewer_has_liked,
+      likes_count: Math.max(0, counts.likes_count),
+    });
     // Named fields rather than a spread: the like endpoints answer with a
     // `post_id` alongside the counts, and spreading the whole reply would graft
     // that onto the post.
-  }, []);
+  }, [patchPostState]);
 
-  const adjustComments = useCallback((postId: string, change: { by: number } | { to: number }) => {
-    setPosts((previous) =>
-      previous.map((post) =>
-        post.id === postId
-          ? {
-              ...post,
-              comments_count: Math.max(
-                0,
-                'to' in change ? change.to : post.comments_count + change.by
-              ),
-            }
-          : post
-      )
-    );
-  }, []);
+  const adjustComments = useCallback(
+    (postId: string, change: { by: number } | { to: number }) => {
+      setPosts((previous) =>
+        previous.map((post) =>
+          post.id === postId
+            ? {
+                ...post,
+                comments_count: Math.max(
+                  0,
+                  'to' in change ? change.to : post.comments_count + change.by
+                ),
+              }
+            : post
+        )
+      );
+
+      setPostState((previous) => {
+        const current = previous[postId];
+
+        /*
+         * `by` needs something to count from, and there is nothing to count
+         * from for a post this context has never held. Callers drawing a post
+         * from their own list pass `to` for that reason; the feed's own
+         * counter above is already right either way.
+         */
+        const base = 'to' in change ? change.to : (current?.comments_count ?? NaN) + change.by;
+        if (Number.isNaN(base)) return previous;
+
+        return {
+          ...previous,
+          [postId]: { ...current, comments_count: Math.max(0, base) },
+        };
+      });
+    },
+    []
+  );
 
   const prepend = useCallback((post: Post) => {
     // Guarded against a refresh having already raced it in, which would
@@ -280,6 +340,9 @@ export function FeedProvider({ children }: { children: ReactNode }) {
       toggleSaved,
       applyLike,
       adjustComments,
+      postState,
+      composingPostId,
+      setComposingPost,
     }),
     [
       posts,
@@ -297,6 +360,8 @@ export function FeedProvider({ children }: { children: ReactNode }) {
       toggleSaved,
       applyLike,
       adjustComments,
+      postState,
+      composingPostId,
     ]
   );
 

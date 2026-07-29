@@ -56,18 +56,13 @@ export function AppHeader() {
           <Text className="font-logo-extrabold text-2xl leading-8 text-ink">Winly</Text>
         </View>
 
-        {/* Settings used to sit here; it moved to the Profile tab when the
-            design gave the second slot to messages. */}
+        {/* Settings sits on the Profile tab, and messages have gone for now —
+            so the bell is the only thing up here. */}
         <View className="flex-row items-center gap-2.5">
           <HeaderAction
             icon={{ ios: 'bell', android: 'notifications', web: 'notifications' }}
             label="Notifications"
             onPress={() => router.push('/notifications')}
-          />
-          <HeaderAction
-            icon={{ ios: 'bubble.left', android: 'chat_bubble_outline', web: 'chat_bubble_outline' }}
-            label="Messages"
-            onPress={() => router.push('/messages')}
           />
         </View>
       </View>

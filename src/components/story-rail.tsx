@@ -11,6 +11,8 @@ import { useStoryRail } from '@/lib/use-story-rail';
 
 const BUBBLE = 62;
 const RING = 68;
+/** The add badge, and what its offset from the ring's edge is measured against. */
+const BADGE = 24;
 
 /** A circular avatar that falls back to an initial when there is no photo. */
 function Avatar({ uri, name, size }: { uri: string | null; name: string; size: number }) {
@@ -18,6 +20,7 @@ function Avatar({ uri, name, size }: { uri: string | null; name: string; size: n
     <ImageWithPlaceholder
       source={{ uri }}
       className="rounded-full"
+      size={size}
       accessibilityLabel={`${name} profile photo`}>
       <View
         className="items-center justify-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500"
@@ -101,13 +104,21 @@ function OwnBubble({
   /** Always adds, whatever is already up. */
   onAdd: () => void;
 }) {
+  /*
+   * The bubble and the badge are siblings, not one inside the other.
+   *
+   * They were nested, which reads fine on native but is invalid on web — a
+   * button cannot contain a button — and it left the two overlapping targets
+   * arguing over the same tap. The wrapper is a plain `View` that only supplies
+   * the positioning context the badge hangs off.
+   */
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={hasStory ? 'Watch your story' : 'Add story'}
-      onPress={onPress}
-      className="w-[86px] items-center gap-2 active:opacity-70">
-      <View>
+    <View className="w-[86px] items-center">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={hasStory ? 'Watch your story' : 'Add story'}
+        onPress={onPress}
+        className="items-center gap-2 active:opacity-70">
         {hasStory ? (
           // Always bright: your own ring tracks whether you have something up,
           // not whether you have watched it. You know what you posted.
@@ -125,28 +136,31 @@ function OwnBubble({
           </View>
         )}
 
-        {hasStory ? (
-          // Demoted to a badge once there is a story to show behind it, and its
-          // own button: the bubble watches, the badge adds.
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Add to your story"
-            onPress={onAdd}
-            hitSlop={6}
-            className="absolute bottom-0 right-0 h-6 w-6 items-center justify-center rounded-full border-2 border-surface active:opacity-70"
-            style={{ backgroundColor: accent }}>
-            <SymbolView
-              name={{ ios: 'plus', android: 'add', web: 'add' }}
-              size={12}
-              weight="bold"
-              tintColor="#FFFFFF"
-            />
-          </Pressable>
-        ) : null}
-      </View>
+        <Caption>{hasStory ? 'Your story' : 'Add story'}</Caption>
+      </Pressable>
 
-      <Caption>{hasStory ? 'Your story' : 'Add story'}</Caption>
-    </Pressable>
+      {hasStory ? (
+        // Demoted to a badge once there is a story to show behind it, and its
+        // own button: the bubble watches, the badge adds.
+        //
+        // Placed against the ring rather than the column, which is taller by
+        // the caption underneath — hence the offsets rather than `bottom-0`.
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Add to your story"
+          onPress={onAdd}
+          hitSlop={6}
+          className="absolute h-6 w-6 items-center justify-center rounded-full border-2 border-surface active:opacity-70"
+          style={{ backgroundColor: accent, top: RING - BADGE, right: (86 - RING) / 2 }}>
+          <SymbolView
+            name={{ ios: 'plus', android: 'add', web: 'add' }}
+            size={12}
+            weight="bold"
+            tintColor="#FFFFFF"
+          />
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 

@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EntryHeader, PILLAR_THEME, useDismissEntryFlow } from '@/components/entry-chrome';
 import { TextArea } from '@/components/ui/text-area';
+import { Colors } from '@/constants/theme';
 import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { buildWins, OTHER_ACTIVITY, useEntryDraft, type Pillar } from '@/lib/entry-draft';
@@ -39,7 +40,7 @@ const photoCount = (n: number) => `${n} photo${n === 1 ? '' : 's'} attached`;
  */
 export default function ReviewStepScreen() {
   const insets = useSafeAreaInsets();
-  const { draft, setCaption, submit } = useEntryDraft();
+  const { draft, setCaption, submit, targets, lockedToCircle } = useEntryDraft();
   const { prepend } = useFeed();
   const { refreshUser } = useAuth();
   const dismissFlow = useDismissEntryFlow();
@@ -208,6 +209,36 @@ export default function ReviewStepScreen() {
             </Text>
           ) : null}
         </View>
+
+        {/* Where it is going, said before it goes — a statement, not a choice.
+            Everyone can read it either way; circles are extra walls it appears
+            on, not a smaller audience. One post reaches every circle listed, so
+            nobody sees it twice for being in more than one of them. */}
+        {targets.length > 0 ? (
+          <View className="mt-6 flex-row items-center gap-2.5 rounded-2xl bg-surface-card px-4 py-3.5">
+            <SymbolView
+              name={{ ios: 'person.2', android: 'group', web: 'group' }}
+              size={16}
+              tintColor={Colors.light.textSecondary}
+            />
+
+            <View className="flex-1">
+              <Text className="font-sans text-[13px] leading-[18px] text-ink-muted">
+                Everyone will see this. Also posting to{' '}
+                <Text className="font-body-semibold text-ink">
+                  {lockedToCircle || targets.length === 1
+                    ? targets[0].name
+                    : `all ${targets.length} of your circles`}
+                </Text>
+              </Text>
+              {!lockedToCircle && targets.length > 1 ? (
+                <Text className="mt-0.5 font-sans text-[12px] leading-4 text-ink-muted">
+                  One post — nobody sees it more than once.
+                </Text>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
 
         <Pressable
           accessibilityRole="button"

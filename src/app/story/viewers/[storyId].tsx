@@ -20,6 +20,7 @@ function ViewerRow({ viewer }: { viewer: StoryViewer }) {
       <ImageWithPlaceholder
         source={{ uri: viewer.avatar_url }}
         className="rounded-full"
+        size={AVATAR}
         accessibilityLabel={`${name} profile photo`}>
         <View
           className="items-center justify-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500"
