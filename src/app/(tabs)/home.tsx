@@ -1,12 +1,11 @@
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
   RefreshControl,
-  ScrollView,
   Text,
   View,
 } from 'react-native';
@@ -14,12 +13,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PostCard } from '@/components/post-card';
 import { StoryRail } from '@/components/story-rail';
-import { Image, ImageWithPlaceholder } from '@/components/ui/image';
-import { ProgressRing } from '@/components/ui/progress-ring';
+import { ImageWithPlaceholder, Image } from '@/components/ui/image';
+import { SegmentedRing } from '@/components/ui/segmented-ring';
 import { BottomTabInset, Colors } from '@/constants/theme';
 import { useAuth } from '@/lib/auth-context';
-import { FEED_TABS, TODAY_METRICS, type FeedTab } from '@/lib/home-data';
+import { FEED_TABS, type FeedTab } from '@/lib/home-data';
 import { useFeed } from '@/lib/feed-context';
+import { WIN_KINDS, type WeekProgress } from '@/lib/progress';
+import { useWeekProgress } from '@/lib/use-week-progress';
 
 /** The green the home screen leans on: headings, buttons, the active tab. */
 const GREEN = '#5FBC88';
@@ -68,15 +69,132 @@ function Avatar({
   );
 }
 
+/**
+ * This week, a ring per day.
+ *
+ * Each ring is broken into three dashes — meditation, learning, movement, in
+ * that order — so a day says which kinds of win landed on it, not merely how
+ * many. Seven fit across a phone without scrolling, which is the point of
+ * showing the week rather than a scrolling row of invented daily metrics: the
+ * whole week is one glance.
+ */
+function WeeklyProgress({
+  week,
+  loading,
+  error,
+}: {
+  week: WeekProgress | null;
+  loading: boolean;
+  error: string | null;
+}) {
+  return (
+    <View className="mx-4 mt-4 rounded-3xl bg-surface-card px-4 py-4">
+      <View className="flex-row items-center justify-between">
+        <Text className="font-heading-bold text-lg leading-6 text-ink">Weekly Progress</Text>
+        <Text className="font-sans text-[13px] leading-[18px] text-ink-muted">This week</Text>
+      </View>
+
+      {loading && !week ? (
+        <View className="items-center py-8">
+          <ActivityIndicator size="small" color={Colors.light.textSecondary} />
+        </View>
+      ) : error && !week ? (
+        // Said plainly rather than drawn as seven empty rings, which would
+        // read as a week nothing was done in.
+        <Text className="py-8 text-center font-sans text-[13px] leading-[18px] text-ink-muted">
+          {error}
+        </Text>
+      ) : (
+        <>
+          <View className="mt-4 flex-row justify-between">
+            {(week?.days ?? []).map((day) => (
+              <View key={day.date} className="items-center gap-1.5">
+                {/* The day names the ring it belongs to, so the row reads as
+                    Mon–Sun without a separate header line to match up
+                    against. Today is in full ink and a day still to come is
+                    dimmed: the week reads as in progress rather than as half
+                    missed. */}
+                <SegmentedRing
+                  size={40}
+                  thickness={3}
+                  segments={WIN_KINDS.map((kind) => ({
+                    key: kind.key,
+                    color: kind.color,
+                    done: day[kind.key],
+                  }))}>
+                  <Text
+                    className={`text-[10px] leading-[14px] ${
+                      day.is_today
+                        ? 'font-body-semibold text-ink'
+                        : day.is_future
+                          ? 'font-sans text-ink-muted opacity-50'
+                          : 'font-sans text-ink-muted'
+                    }`}>
+                    {day.weekday}
+                  </Text>
+                </SegmentedRing>
+
+                <Text
+                  className={`text-[11px] leading-4 ${
+                    day.is_today ? 'font-body-semibold text-ink' : 'font-sans text-ink-muted'
+                  } ${day.is_future ? 'opacity-50' : ''}`}>
+                  {day.day_of_month}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Without this the three dashes are decoration. */}
+          <View className="mt-4 flex-row flex-wrap items-center gap-x-4 gap-y-2 border-t border-hairline pt-3">
+            {WIN_KINDS.map((kind) => (
+              <View key={kind.key} className="flex-row items-center gap-1.5">
+                <View
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: kind.color }}
+                />
+                <Text className="font-sans text-[12px] leading-4 text-ink-muted">{kind.label}</Text>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
+    </View>
+  );
+}
+
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [tab, setTab] = useState<FeedTab>('Following');
   const { posts, error, loading, loadingMore, refreshing, hasMore, refresh, loadMore } = useFeed();
+  const {
+    week,
+    loading: weekLoading,
+    error: weekError,
+    refresh: refreshWeek,
+  } = useWeekProgress();
 
   // Only the given name — the full display name reads oddly in a greeting.
   const firstName = user?.full_name.trim().split(' ')[0];
   const greeting = greetingFor(new Date().getHours());
+
+  /**
+   * The streak, preferring the signed-in user's over the week's copy.
+   *
+   * Both are the same server-computed number — the run still standing rather
+   * than the stored column — so this is only ever a question of which is
+   * fresher. The user record wins because more things refresh it: sharing a win
+   * calls `refreshUser` directly, and the story rail calls it again on focus.
+   * The week's copy is the fallback for the first paint, before either has
+   * landed.
+   */
+  const streak = user?.streak_days ?? week?.streak_days ?? 0;
+
+  // One pull refreshes both — the week sits inside the list header, so a feed
+  // that reloaded while the card above it did not would look broken.
+  const refreshAll = useCallback(async () => {
+    await Promise.all([refresh(), refreshWeek()]);
+  }, [refresh, refreshWeek]);
 
   /**
    * Everything above the feed. It rides as the list header rather than wrapping
@@ -109,7 +227,7 @@ export default function HomeScreen() {
           <Text
             className="font-heading-bold text-[15px] leading-5"
             style={{ color: STREAK_ORANGE }}>
-            🔥 {user?.streak_days ?? 0}
+            🔥 {streak}
           </Text>
           <Text className="font-sans text-[11px] leading-4" style={{ color: STREAK_ORANGE }}>
             Day streak
@@ -154,39 +272,7 @@ export default function HomeScreen() {
         />
       </View>
 
-      <View className="mx-4 mt-4 rounded-3xl bg-surface-card px-4 py-4">
-        <View className="flex-row items-center justify-between">
-          <Text className="font-heading-bold text-lg leading-6 text-ink">Today&rsquo;s Progress</Text>
-          <Pressable accessibilityRole="button" hitSlop={8} className="active:opacity-60">
-            <Text className="font-body-semibold text-[15px] leading-5" style={{ color: GREEN }}>
-              View all
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* Five metrics never fit across a phone, so the row scrolls rather
-            than squeezing the rings down to illegibility. */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="-mx-4 mt-4 grow-0"
-          contentContainerClassName="gap-4 px-4">
-          {TODAY_METRICS.map((metric) => (
-            <View key={metric.key} className="items-center gap-2">
-              <ProgressRing progress={metric.progress} color={metric.color} size={66} thickness={5}>
-                <SymbolView name={metric.icon} size={22} tintColor={metric.color} />
-              </ProgressRing>
-              <Text className="font-body-semibold text-[13px] leading-[18px] text-ink">
-                {metric.label}
-              </Text>
-              <Text className="font-sans text-[12px] leading-4 text-ink-muted">
-                {metric.value}
-                {metric.progress >= 1 ? ' ✓' : ''}
-              </Text>
-            </View>
-          ))}
-        </ScrollView>
-      </View>
+      <WeeklyProgress week={week} loading={weekLoading} error={weekError} />
 
     {/* The tabs are presentational for now: the feed endpoint takes only
         `per_page` and `cursor`, with no audience filter, so all three show
@@ -240,7 +326,7 @@ export default function HomeScreen() {
           paddingBottom: BottomTabInset + insets.bottom + 24,
         }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={GREEN} />
+          <RefreshControl refreshing={refreshing} onRefresh={refreshAll} tintColor={GREEN} />
         }
         onEndReached={() => void loadMore()}
         onEndReachedThreshold={0.6}
