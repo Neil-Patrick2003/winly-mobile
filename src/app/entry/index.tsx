@@ -27,7 +27,7 @@ export default function EntryIntroScreen() {
       <EntryHeader />
 
       <ScrollView
-        contentContainerClassName="w-full max-w-[800px] self-center px-6"
+        contentContainerClassName="w-full max-w-[800px] self-center px-4"
         contentContainerStyle={{ paddingTop: 28, paddingBottom: insets.bottom + 24 }}>
         <View className="items-center gap-3">
           <Image

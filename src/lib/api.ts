@@ -77,7 +77,7 @@ type RequestOptions = {
 };
 
 async function apiRequest<TResponse>(
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
   { body, token }: RequestOptions = {}
 ): Promise<TResponse> {
@@ -123,10 +123,7 @@ async function apiRequest<TResponse>(
   }
 
   if (response.status === 413) {
-    throw new ApiError(
-      413,
-      data.message ?? 'That file is too large to upload. Try a smaller one.'
-    );
+    throw new ApiError(413, data.message ?? 'That file is too large to upload. Try a smaller one.');
   }
 
   if (response.status === 429) {
@@ -134,7 +131,8 @@ async function apiRequest<TResponse>(
     // The login limiter states the wait in its message rather than the header,
     // so fall back to the first number there before giving up on 60.
     const fromMessage = Number(data.message?.match(/(\d+)\s*second/i)?.[1]);
-    const seconds = [header, fromMessage].find((value) => Number.isFinite(value) && value > 0) ?? 60;
+    const seconds =
+      [header, fromMessage].find((value) => Number.isFinite(value) && value > 0) ?? 60;
 
     throw new ApiError(
       429,
@@ -157,4 +155,18 @@ export function apiGet<TResponse>(path: string, token?: string | null) {
 
 export function apiPost<TResponse>(path: string, body?: unknown, token?: string | null) {
   return apiRequest<TResponse>('POST', path, { body, token });
+}
+
+/** `body` is optional: some PUT endpoints are pure state assertions with nothing to send. */
+export function apiPut<TResponse>(path: string, body?: unknown, token?: string | null) {
+  return apiRequest<TResponse>('PUT', path, { body, token });
+}
+
+/** A partial update — only the fields in `body` are touched. */
+export function apiPatch<TResponse>(path: string, body?: unknown, token?: string | null) {
+  return apiRequest<TResponse>('PATCH', path, { body, token });
+}
+
+export function apiDelete<TResponse>(path: string, token?: string | null) {
+  return apiRequest<TResponse>('DELETE', path, { token });
 }

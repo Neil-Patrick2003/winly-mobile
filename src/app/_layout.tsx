@@ -96,6 +96,9 @@ function RootNavigator() {
       <Stack.Screen name="login" options={SWAP} />
       <Stack.Screen name="settings" />
       <Stack.Screen name="messages" />
+      {/* Pushed from a feed card's comment count, so it reads as going one
+          level into that post rather than as a separate place. */}
+      <Stack.Screen name="comments/[postId]" />
       {/* Entering the app is a context change, not a push — and the swipe-back
           gesture is disabled so you cannot slide back into the auth flow. */}
       <Stack.Screen

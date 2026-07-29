@@ -3,27 +3,13 @@ import type { SymbolViewProps } from 'expo-symbols';
 /**
  * Placeholder content for the home screen.
  *
- * None of this is fetched: the API exposes post creation and nothing else yet —
- * no stories, no daily metrics, no feed. Each export is already the shape the
- * screen consumes, so wiring a real endpoint later means replacing the array
- * rather than reworking the layout.
+ * What is left here has no endpoint yet: the daily metrics are invented, and the
+ * feed tabs are labels the server has no filter for. Stories and the feed are
+ * real now and live in `stories.ts` and `posts.ts`.
  *
  * The signed-in user's own greeting, avatar and streak are *not* here — those
  * come from `useAuth`, which has them today.
  */
-
-export type Story = {
-  id: string;
-  name: string;
-  avatarUrl: string | null;
-};
-
-export const STORIES: Story[] = [
-  { id: 'maya', name: 'Maya', avatarUrl: null },
-  { id: 'john', name: 'John', avatarUrl: null },
-  { id: 'rhea', name: 'Rhea', avatarUrl: null },
-  { id: 'sam', name: 'Sam', avatarUrl: null },
-];
 
 export type Metric = {
   key: string;

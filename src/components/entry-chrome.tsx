@@ -226,7 +226,7 @@ export function StepFooter({
 
   return (
     <View
-      className="bg-surface-card px-6 pt-3"
+      className="bg-surface-card px-4 pt-3"
       // On a gesture-bar device the inset supplies the room below; without one,
       // 14 stands in — the same rule the tab bar uses.
       style={{ paddingBottom: Math.max(insets.bottom, 14) }}>

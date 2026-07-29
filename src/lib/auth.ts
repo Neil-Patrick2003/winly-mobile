@@ -13,6 +13,12 @@ export type User = {
   cover_gradient: string;
   streak_days: number;
   wins_count: number;
+  /**
+   * True while you have a story that has not expired. The story rail reads this
+   * to decide whether your bubble is an empty "add" control or your own live
+   * story — so anything that posts or deletes one has to refresh the user.
+   */
+  has_active_story: boolean;
   bio: string | null;
   is_private: boolean;
   /** Null until the emailed verification link is followed. Informational only —

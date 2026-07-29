@@ -14,7 +14,7 @@ export default function SettingsScreen() {
 
   return (
     <View className="flex-1 bg-surface" style={{ paddingTop: insets.top }}>
-      <View className="w-full max-w-[800px] flex-1 self-center px-6">
+      <View className="w-full max-w-[800px] flex-1 self-center px-4">
         <View className="flex-row items-center gap-2 pt-2">
           <Pressable
             accessibilityRole="button"

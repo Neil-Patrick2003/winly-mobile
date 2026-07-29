@@ -10,7 +10,7 @@ import {
 } from 'react';
 
 import { useAuth } from '@/lib/auth-context';
-import { fetchFeed, type Post } from '@/lib/posts';
+import { fetchFeed, withLikeState, type LikeCounts, type Post } from '@/lib/posts';
 
 /**
  * The cursor-paginated feed.
@@ -36,6 +36,46 @@ type FeedValue = {
   loadMore: () => Promise<void>;
   /** Put a just-created post at the top without going back to the server. */
   prepend: (post: Post) => void;
+  /**
+   * Authors the viewer follows, as far as this session knows.
+   *
+   * Seeded empty, because the feed does not say: `UserSummaryResource` carries
+   * no `is_following`, so a post by someone already followed still offers to
+   * follow them. That is harmless — the endpoint is idempotent and will not
+   * double-count — but it is why this cannot be trusted as the truth, only as
+   * what the viewer has done since the app opened.
+   */
+  followedIds: ReadonlySet<string>;
+  setFollowed: (userId: string, following: boolean) => void;
+  /**
+   * Posts the viewer has saved.
+   *
+   * Session-only, and deliberately so: the API has no bookmark endpoint, so
+   * there is nowhere to put this. It survives scrolling — which per-card state
+   * would not, since the list recycles rows — and nothing more.
+   */
+  savedPostIds: ReadonlySet<string>;
+  toggleSaved: (postId: string) => void;
+  /**
+   * Write a post's like state back into the row.
+   *
+   * Not a set alongside `savedPostIds`, because likes are not this session's
+   * secret: every feed row carries `viewer_has_liked` and `likes_count`, so the
+   * row already is the record and a parallel set would only be a second answer
+   * to the same question. Takes the whole pair rather than a boolean so the
+   * server's count can be applied verbatim — the viewer's own tap is not the
+   * only thing that moves it.
+   */
+  applyLike: (postId: string, counts: LikeCounts) => void;
+  /**
+   * Move a post's comment total, so the card's counter keeps up with a
+   * conversation happening on another screen.
+   *
+   * Two forms because the endpoints answer differently: creating hands back the
+   * comment and says nothing about the total, so the client counts (`by`);
+   * deleting hands back `comments_count`, which is the authority (`to`).
+   */
+  adjustComments: (postId: string, change: { by: number } | { to: number }) => void;
 };
 
 const FeedContext = createContext<FeedValue | null>(null);
@@ -49,10 +89,44 @@ export function FeedProvider({ children }: { children: ReactNode }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [followedIds, setFollowedIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [savedPostIds, setSavedPostIds] = useState<ReadonlySet<string>>(() => new Set());
 
   const cursor = useRef<string | null>(null);
   const atEnd = useRef(false);
   const inFlight = useRef(false);
+
+  /**
+   * Take the follow state the server just reported for a page of authors.
+   *
+   * `is_following` is optional, and an author who arrives without it is left
+   * exactly as it was — an older server that does not send the field must not
+   * silently unfollow everyone on screen.
+   *
+   * A reset — first load or pull-to-refresh — rebuilds the set from scratch, so
+   * a follow undone elsewhere (another device, or a row deleted straight out of
+   * the database) is picked up rather than remembered forever. Loading a further
+   * page only adds to it, since those posts say nothing about authors already
+   * seen.
+   */
+  const applyFollowState = useCallback((page: Post[], reset: boolean) => {
+    setFollowedIds((previous) => {
+      const next = new Set(reset ? [] : previous);
+
+      for (const { author } of page) {
+        if (author.is_following === undefined) {
+          // Unknown: keep whatever was already believed about them.
+          if (previous.has(author.id)) next.add(author.id);
+          continue;
+        }
+
+        if (author.is_following) next.add(author.id);
+        else next.delete(author.id);
+      }
+
+      return next;
+    });
+  }, []);
 
   const load = useCallback(
     async (reset: boolean) => {
@@ -67,14 +141,19 @@ export function FeedProvider({ children }: { children: ReactNode }) {
         cursor.current = page.meta.next_cursor;
         atEnd.current = page.meta.next_cursor === null;
         setHasMore(!atEnd.current);
-        setPosts((previous) => (reset ? page.data : [...previous, ...page.data]));
+        // The server's own like state wins outright on a reset, which is what
+        // makes a like survive a pull-to-refresh: the row carries
+        // `viewer_has_liked`, so there is nothing local to preserve across it.
+        const rows = page.data.map(withLikeState);
+        setPosts((previous) => (reset ? rows : [...previous, ...rows]));
+        applyFollowState(page.data, reset);
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : 'Could not load the feed.');
       } finally {
         inFlight.current = false;
       }
     },
-    [token]
+    [token, applyFollowState]
   );
 
   useEffect(() => {
@@ -103,11 +182,65 @@ export function FeedProvider({ children }: { children: ReactNode }) {
     setLoadingMore(false);
   }, [load]);
 
+  const setFollowed = useCallback((userId: string, following: boolean) => {
+    setFollowedIds((previous) => {
+      if (previous.has(userId) === following) return previous;
+
+      const next = new Set(previous);
+      if (following) next.add(userId);
+      else next.delete(userId);
+      return next;
+    });
+  }, []);
+
+  const toggleSaved = useCallback((postId: string) => {
+    setSavedPostIds((previous) => {
+      const next = new Set(previous);
+      if (!next.delete(postId)) next.add(postId);
+      return next;
+    });
+  }, []);
+
+  const applyLike = useCallback((postId: string, counts: LikeCounts) => {
+    setPosts((previous) =>
+      previous.map((post) =>
+        post.id === postId
+          ? {
+              ...post,
+              viewer_has_liked: counts.viewer_has_liked,
+              // Floored, so a stale optimistic decrement can never flash a
+              // negative count while the server's real answer is in flight.
+              likes_count: Math.max(0, counts.likes_count),
+            }
+          : post
+      )
+    );
+    // Named fields rather than a spread: the like endpoints answer with a
+    // `post_id` alongside the counts, and spreading the whole reply would graft
+    // that onto the post.
+  }, []);
+
+  const adjustComments = useCallback((postId: string, change: { by: number } | { to: number }) => {
+    setPosts((previous) =>
+      previous.map((post) =>
+        post.id === postId
+          ? {
+              ...post,
+              comments_count: Math.max(
+                0,
+                'to' in change ? change.to : post.comments_count + change.by
+              ),
+            }
+          : post
+      )
+    );
+  }, []);
+
   const prepend = useCallback((post: Post) => {
     // Guarded against a refresh having already raced it in, which would
     // otherwise show the same post twice.
     setPosts((previous) =>
-      previous.some((item) => item.id === post.id) ? previous : [post, ...previous]
+      previous.some((item) => item.id === post.id) ? previous : [withLikeState(post), ...previous]
     );
   }, []);
 
@@ -122,8 +255,30 @@ export function FeedProvider({ children }: { children: ReactNode }) {
       refresh,
       loadMore,
       prepend,
+      followedIds,
+      setFollowed,
+      savedPostIds,
+      toggleSaved,
+      applyLike,
+      adjustComments,
     }),
-    [posts, error, loading, loadingMore, refreshing, hasMore, refresh, loadMore, prepend]
+    [
+      posts,
+      error,
+      loading,
+      loadingMore,
+      refreshing,
+      hasMore,
+      refresh,
+      loadMore,
+      prepend,
+      followedIds,
+      setFollowed,
+      savedPostIds,
+      toggleSaved,
+      applyLike,
+      adjustComments,
+    ]
   );
 
   return <FeedContext.Provider value={value}>{children}</FeedContext.Provider>;

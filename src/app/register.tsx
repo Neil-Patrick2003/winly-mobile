@@ -142,7 +142,7 @@ export default function RegisterScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           className="flex-1"
-          contentContainerClassName="w-full max-w-[800px] grow self-center px-6"
+          contentContainerClassName="w-full max-w-[800px] grow self-center px-4"
           contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 24 }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag">

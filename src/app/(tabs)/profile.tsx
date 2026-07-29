@@ -47,7 +47,7 @@ export default function ProfileScreen() {
 
   if (!user) {
     return (
-      <View className="flex-1 items-center justify-center gap-4 bg-surface px-6">
+      <View className="flex-1 items-center justify-center gap-4 bg-surface px-4">
         <Wordmark />
         <Text className="text-center font-sans text-sm leading-5 text-ink-muted">
           You are not signed in.
@@ -73,7 +73,7 @@ export default function ProfileScreen() {
   return (
     <View className="flex-1 bg-surface">
       <ScrollView
-        contentContainerClassName="w-full max-w-[800px] self-center px-6"
+        contentContainerClassName="w-full max-w-[800px] self-center px-4"
         contentContainerStyle={{
           paddingTop: 16,
           paddingBottom: BottomTabInset + insets.bottom + 24,

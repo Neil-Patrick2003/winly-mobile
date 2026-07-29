@@ -1,6 +1,6 @@
 import { File } from 'expo-file-system';
 
-import { apiGet, apiPost } from '@/lib/api';
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from '@/lib/api';
 
 /**
  * A post is one shared moment carrying up to three wins — not one post per
@@ -35,12 +35,32 @@ export type PostAuthor = {
   /** Nullable — never render "@" against it unguarded. */
   username: string | null;
   avatar_url: string | null;
+  /**
+   * Whether the signed-in reader follows this author.
+   *
+   * Optional because the server only sends it where it actually looked: the
+   * feed does, the follow endpoints do not. Undefined means unknown, which is
+   * not the same as `false` — treat it as "leave what you already knew alone"
+   * rather than as "not following".
+   */
+  is_following?: boolean;
+  /** True while this author has a story that has not expired. */
+  has_active_story?: boolean;
 };
 
-export type Post = {
+/**
+ * The like state of a post, as both the feed row and the like endpoints report
+ * it. Unlike `PostAuthor.is_following`, the feed always carries these, so they
+ * can be read straight off a row without a follow-up request.
+ */
+export type LikeCounts = {
+  likes_count: number;
+  viewer_has_liked: boolean;
+};
+
+export type Post = LikeCounts & {
   id: string;
   caption: string | null;
-  likes_count: number;
   comments_count: number;
   shares_count: number;
   created_at: string;
@@ -248,6 +268,146 @@ export async function createPost(input: CreatePostInput, token: string) {
   return response.data;
 }
 
+/** Where the caller stands with a user, as the follow endpoints report it. */
+export type FollowState = {
+  user: PostAuthor;
+  is_following: boolean;
+  followers_count: number;
+};
+
+/**
+ * Follow or unfollow a user.
+ *
+ * Both directions are idempotent server-side — following twice does not count
+ * twice, and unfollowing someone you never followed is treated as already done
+ * — so a client that has lost track can simply say what it wants to be true.
+ * The one thing that is refused is following yourself, which comes back as a
+ * 422 against the `user` field.
+ */
+export async function setFollowing(userId: string, following: boolean, token: string) {
+  const path = `/api/v1/users/${userId}/follow`;
+
+  const response = following
+    ? await apiPost<{ data: FollowState }>(path, undefined, token)
+    : await apiDelete<{ data: FollowState }>(path, token);
+
+  return response.data;
+}
+
+/** What the like endpoints answer with, echoing the post they acted on. */
+export type LikeState = LikeCounts & { post_id: string };
+
+/**
+ * Settle a post's like state as it comes in off the wire.
+ *
+ * Both fields are documented as always present on a feed row, so this is a
+ * floor and not a translation — it exists so that a row which somehow arrives
+ * without them renders as a plain unliked post rather than an empty heart next
+ * to `NaN`. `Boolean` rather than `=== true` because a JSON `1` is the shape
+ * this would most plausibly arrive in.
+ *
+ * Applied at every door into the feed store, so nothing downstream of it has to
+ * keep asking whether the fields really came.
+ */
+export function withLikeState(post: Post): Post {
+  return {
+    ...post,
+    likes_count: Number.isFinite(post.likes_count) ? Math.max(0, post.likes_count) : 0,
+    viewer_has_liked: Boolean(post.viewer_has_liked),
+  };
+}
+
+/**
+ * Like or unlike a post.
+ *
+ * Both directions are idempotent, so this states what should be true rather
+ * than asking for a change: liking something already liked answers 200 with the
+ * count untouched, and unliking something never liked is treated as already
+ * done. Only the very first like is a 201, which is why the status is not worth
+ * branching on — the returned counts are the authority either way, and a client
+ * that has drifted is corrected by applying them.
+ *
+ * A 404 means the post is gone, which is worth surfacing: it is the one outcome
+ * where retrying will not help.
+ */
+export async function setLiked(postId: string, liked: boolean, token: string) {
+  const path = `/api/v1/posts/${postId}/like`;
+
+  const response = liked
+    ? await apiPut<{ data: LikeState }>(path, undefined, token)
+    : await apiDelete<{ data: LikeState }>(path, token);
+
+  return response.data;
+}
+
+/**
+ * One comment on a post.
+ *
+ * `author` is the same summary shape the feed uses, minus the follow flag —
+ * these endpoints do not look it up, so `is_following` arrives undefined and
+ * must be read as "unknown" rather than "not following".
+ */
+export type Comment = {
+  id: string;
+  post_id: string;
+  text: string;
+  created_at: string;
+  /** Differs from `created_at` once edited, which is how an edit is detectable. */
+  updated_at: string;
+  author: PostAuthor;
+};
+
+/**
+ * What DELETE answers with: not the comment, but the post's new total. That is
+ * the one number worth having back, since the card showing it is elsewhere.
+ */
+export type CommentDeletion = {
+  id: string;
+  post_id: string;
+  comments_count: number;
+};
+
+/** The server's own bounds on `text`. Empty is rejected, so is anything longer. */
+export const COMMENT_MIN = 1;
+export const COMMENT_MAX = 2000;
+
+/** POST /api/v1/posts/{postId}/comments — 201 with the created comment. */
+export async function createComment(postId: string, text: string, token: string) {
+  const response = await apiPost<{ data: Comment }>(
+    `/api/v1/posts/${postId}/comments`,
+    { text },
+    token
+  );
+
+  return response.data;
+}
+
+/**
+ * PATCH /api/v1/comments/{commentId} — 200 with the comment as it now stands.
+ *
+ * Only the author may edit, so a 403 here is the expected refusal rather than a
+ * fault; its message is worth showing as-is.
+ */
+export async function updateComment(commentId: string, text: string, token: string) {
+  const response = await apiPatch<{ data: Comment }>(
+    `/api/v1/comments/${commentId}`,
+    { text },
+    token
+  );
+
+  return response.data;
+}
+
+/** DELETE /api/v1/comments/{commentId} — 200 with the post's remaining total. */
+export async function deleteComment(commentId: string, token: string) {
+  const response = await apiDelete<{ data: CommentDeletion }>(
+    `/api/v1/comments/${commentId}`,
+    token
+  );
+
+  return response.data;
+}
+
 /** The server's own default; 50 is the ceiling it enforces. */
 const PER_PAGE = 15;
 
@@ -263,6 +423,42 @@ export async function fetchFeed(token: string, cursor?: string, perPage = PER_PA
   if (cursor) query.set('cursor', cursor);
 
   return apiGet<Page<Post>>(`/api/v1/posts?${query.toString()}`, token);
+}
+
+/**
+ * GET /api/v1/posts/{postId} — one post, in the same shape a feed row has.
+ *
+ * It carries no comments, only `comments_count`; the thread is its own
+ * endpoint. Worth calling when the post is wanted but not to hand — a thread
+ * opened from a notification, or one whose post has since fallen off the pages
+ * the feed is holding.
+ */
+export async function fetchPost(postId: string, token: string) {
+  const response = await apiGet<{ data: Post }>(`/api/v1/posts/${postId}`, token);
+
+  return response.data;
+}
+
+/** The comment endpoint's own default. Its ceiling is 50, the feed's is not. */
+const COMMENTS_PER_PAGE = 20;
+
+/**
+ * GET /api/v1/posts/{postId}/comments — the same cursor envelope as the feed.
+ *
+ * Newest first, so page one holds the latest comments and paging walks back
+ * into older ones. The screen renders that order rather than imposing its own:
+ * reversing a cursor-paged list would strand whichever end the server put last.
+ */
+export async function fetchComments(
+  postId: string,
+  token: string,
+  cursor?: string,
+  perPage = COMMENTS_PER_PAGE
+) {
+  const query = new URLSearchParams({ per_page: String(perPage) });
+  if (cursor) query.set('cursor', cursor);
+
+  return apiGet<Page<Comment>>(`/api/v1/posts/${postId}/comments?${query.toString()}`, token);
 }
 
 /**

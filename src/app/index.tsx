@@ -30,7 +30,7 @@ export default function WelcomeScreen() {
       />
 
       <View
-        className="w-full max-w-[800px] flex-1 select-none justify-between self-center px-6"
+        className="w-full max-w-[800px] flex-1 select-none justify-between self-center px-4"
         style={{ paddingTop: insets.top, paddingBottom: insets.bottom + 24 }}>
         <View className="items-center gap-2 pt-8">
           <Image

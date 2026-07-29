@@ -68,7 +68,7 @@ export default function MeditationStepScreen() {
       <EntryHeader />
 
       <ScrollView
-        contentContainerClassName="w-full max-w-[800px] self-center px-6"
+        contentContainerClassName="w-full max-w-[800px] self-center px-4"
         contentContainerStyle={{ paddingTop: 20, paddingBottom: 24 }}
         keyboardShouldPersistTaps="handled">
         <StepIndicator active="meditation" />

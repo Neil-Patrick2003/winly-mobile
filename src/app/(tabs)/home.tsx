@@ -13,11 +13,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PostCard } from '@/components/post-card';
+import { StoryRail } from '@/components/story-rail';
 import { Image, ImageWithPlaceholder } from '@/components/ui/image';
 import { ProgressRing } from '@/components/ui/progress-ring';
 import { BottomTabInset, Colors } from '@/constants/theme';
 import { useAuth } from '@/lib/auth-context';
-import { FEED_TABS, STORIES, TODAY_METRICS, type FeedTab } from '@/lib/home-data';
+import { FEED_TABS, TODAY_METRICS, type FeedTab } from '@/lib/home-data';
 import { useFeed } from '@/lib/feed-context';
 
 /** The green the home screen leans on: headings, buttons, the active tab. */
@@ -67,35 +68,6 @@ function Avatar({
   );
 }
 
-/** One story bubble: a ringed avatar with a caption under it. */
-function StoryBubble({
-  name,
-  caption,
-  uri,
-  isYou,
-}: {
-  name: string;
-  caption: string;
-  uri: string | null;
-  isYou?: boolean;
-}) {
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={caption} className="w-[86px] items-center gap-2 active:opacity-70">
-      <View className="rounded-full bg-linear-to-tr from-green-400 via-sky-400 to-violet-400 p-[2.5px]">
-        <View className="rounded-full bg-surface p-[2px]">
-          <Avatar uri={uri} name={name} size={62} className="h-[62px] w-[62px]" />
-        </View>
-        {isYou ? (
-          <View className="absolute bottom-[3px] right-[3px] h-3.5 w-3.5 rounded-full border-2 border-surface bg-[#4ADE80]" />
-        ) : null}
-      </View>
-      <Text numberOfLines={1} className="font-sans text-[13px] leading-[18px] text-ink-muted">
-        {caption}
-      </Text>
-    </Pressable>
-  );
-}
-
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -113,7 +85,7 @@ export default function HomeScreen() {
    */
   const header = (
     <View>
-      <View className="flex-row items-center gap-3 px-5">
+      <View className="flex-row items-center gap-3 px-4">
         <View>
           <Avatar
             uri={user?.avatar_url ?? null}
@@ -145,47 +117,9 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        className="mt-5 grow-0"
-        contentContainerClassName="gap-3 px-5">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Add story"
-          onPress={() => router.push('/entry')}
-          className="w-[86px] items-center gap-2 active:opacity-70">
-          <View
-            className="h-[68px] w-[68px] items-center justify-center rounded-full border-2 border-dashed"
-            style={{ borderColor: GREEN }}>
-            <SymbolView
-              name={{ ios: 'plus', android: 'add', web: 'add' }}
-              size={22}
-              weight="medium"
-              tintColor={GREEN}
-            />
-          </View>
-          <Text className="font-sans text-[13px] leading-[18px] text-ink-muted">Add story</Text>
-        </Pressable>
+      <StoryRail accent={GREEN} />
 
-        <StoryBubble
-          name={user?.full_name ?? 'You'}
-          caption="Your story"
-          uri={user?.avatar_url ?? null}
-          isYou
-        />
-
-        {STORIES.map((story) => (
-          <StoryBubble
-            key={story.id}
-            name={story.name}
-            caption={story.name}
-            uri={story.avatarUrl}
-          />
-        ))}
-      </ScrollView>
-
-      <View className="mx-5 mt-5 flex-row overflow-hidden rounded-3xl bg-linear-to-br from-[#EBF6EF] to-[#F1FAF2]">
+      <View className="mx-4 mt-5 flex-row overflow-hidden rounded-3xl bg-linear-to-br from-[#EBF6EF] to-[#F1FAF2]">
         <View className="flex-1 gap-1.5 py-4 pl-4">
           <View>
             <Text className="font-heading-bold text-[18px] leading-6 text-ink">
@@ -220,7 +154,7 @@ export default function HomeScreen() {
         />
       </View>
 
-      <View className="mx-5 mt-4 rounded-3xl bg-surface-card px-4 py-5">
+      <View className="mx-4 mt-4 rounded-3xl bg-surface-card px-4 py-4">
         <View className="flex-row items-center justify-between">
           <Text className="font-heading-bold text-lg leading-6 text-ink">Today&rsquo;s Progress</Text>
           <Pressable accessibilityRole="button" hitSlop={8} className="active:opacity-60">
@@ -257,7 +191,7 @@ export default function HomeScreen() {
     {/* The tabs are presentational for now: the feed endpoint takes only
         `per_page` and `cursor`, with no audience filter, so all three show
         the same posts. */}
-    <View className="mx-5 mt-4 flex-row gap-5 rounded-3xl bg-surface-card px-5">
+    <View className="mx-4 mt-4 flex-row gap-5 rounded-3xl bg-surface-card px-4">
       {FEED_TABS.map((item) => {
         const active = item === tab;
         return (
@@ -293,6 +227,13 @@ export default function HomeScreen() {
         renderItem={({ item }) => <PostCard post={item} />}
         ListHeaderComponent={header}
         showsVerticalScrollIndicator={false}
+        // A card can hold an open comment box. Without this the first tap on
+        // Send only dismisses the keyboard and is swallowed, so posting a
+        // comment from the feed takes two taps and looks broken.
+        keyboardShouldPersistTaps="handled"
+        // iOS only, and ignored elsewhere: insets the list by the keyboard so
+        // the card being typed into is scrolled clear of it.
+        automaticallyAdjustKeyboardInsets
         contentContainerClassName="w-full max-w-[800px] self-center"
         contentContainerStyle={{
           paddingTop: 12,
@@ -309,7 +250,7 @@ export default function HomeScreen() {
               <ActivityIndicator size="small" color={Colors.light.textSecondary} />
             </View>
           ) : (
-            <View className="mx-5 mt-3 items-center gap-2 rounded-3xl bg-surface-card px-6 py-10">
+            <View className="mx-4 mt-3 items-center gap-2 rounded-3xl bg-surface-card px-5 py-10">
               <Text className="text-center font-body-semibold text-base leading-6 text-ink">
                 {error ? 'Could not load the feed' : 'Nothing here yet'}
               </Text>
@@ -340,20 +281,6 @@ export default function HomeScreen() {
           ) : null
         }
       />
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Share a small win"
-        onPress={() => router.push('/entry')}
-        className="absolute bottom-6 right-5 h-[62px] w-[62px] items-center justify-center rounded-full bg-linear-to-br from-[#6CBAC8] to-[#7B92F0] active:opacity-85"
-        style={{ boxShadow: '0 8px 20px rgba(108, 186, 200, 0.45)' }}>
-        <SymbolView
-          name={{ ios: 'plus', android: 'add', web: 'add' }}
-          size={26}
-          weight="medium"
-          tintColor="#FFFFFF"
-        />
-      </Pressable>
     </View>
   );
 }
