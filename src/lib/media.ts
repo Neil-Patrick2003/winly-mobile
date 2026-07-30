@@ -1,5 +1,6 @@
 import { File } from 'expo-file-system';
 import type { ImagePickerAsset } from 'expo-image-picker';
+import { Platform } from 'react-native';
 
 import { API_BASE_URL } from '@/lib/api';
 import type { LocalFile } from '@/lib/posts';
@@ -108,11 +109,40 @@ export function formatBytes(bytes: number) {
  * to drop the photo: let it through and let the upload be the judge.
  */
 export function isWithinUploadLimit(file: LocalFile) {
+  // Web measures the bytes it already holds. It cannot ask `expo-file-system`,
+  // which has no web implementation: `new File(uri)` there is a stub with no
+  // `size` at all, and `undefined <= MAX_UPLOAD_BYTES` is false — so every
+  // photo picked in a browser was turned away as too large to send.
+  if (file.blob) return file.blob.size <= MAX_UPLOAD_BYTES;
+
   try {
     const { size } = new File(file.uri);
     return size === 0 || size <= MAX_UPLOAD_BYTES;
   } catch {
     return true;
+  }
+}
+
+/**
+ * The bytes behind a URI, where the platform needs them handed over rather than
+ * named.
+ *
+ * Web only, and only worth calling after a photo has been re-encoded: the DOM
+ * `File` the picker gave us describes what went into the manipulator, not what
+ * came out of it. `fetch` reads a `blob:` or `data:` URL straight out of memory,
+ * so this touches no network.
+ *
+ * Undefined on native, where a URI is all an upload needs.
+ */
+async function bytesFor(uri: string): Promise<Blob | undefined> {
+  if (Platform.OS !== 'web') return undefined;
+
+  try {
+    return await (await fetch(uri)).blob();
+  } catch {
+    // Left undefined rather than thrown: the upload itself reports a missing
+    // file far better than a shrink step can.
+    return undefined;
   }
 }
 
@@ -134,7 +164,9 @@ export async function shrinkAsset(asset: ImagePickerAsset): Promise<LocalFile> {
   // asset says it is rather than assuming a photo.
   const type = asset.mimeType ?? (asset.type === 'video' ? 'video/mp4' : 'image/jpeg');
 
-  const original: LocalFile = { uri: asset.uri, name, type };
+  // On web the picker returns the DOM `File` alongside the URI; everywhere else
+  // this is undefined and the URI is what gets uploaded. See `LocalFile.blob`.
+  const original: LocalFile = { uri: asset.uri, name, type, blob: asset.file };
 
   if (asset.type === 'video' || type.startsWith('video')) return original;
 
@@ -177,6 +209,7 @@ export async function shrinkAsset(asset: ImagePickerAsset): Promise<LocalFile> {
       uri: result.uri,
       name: name.replace(/\.[^./\\]+$/, '') + '.jpg',
       type: 'image/jpeg',
+      blob: await bytesFor(result.uri),
     };
   } catch {
     // A photo we cannot process is still worth trying to send: the upload may

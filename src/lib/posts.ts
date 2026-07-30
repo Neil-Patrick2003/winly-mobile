@@ -111,6 +111,16 @@ export type LocalFile = {
   uri: string;
   name: string;
   type: string;
+  /**
+   * The bytes themselves, on web.
+   *
+   * `expo-file-system` has no web implementation at all — its `File` there is a
+   * stub whose constructor warns and holds nothing — so a URI is not enough to
+   * upload with in a browser. The picker hands over a real DOM `File` instead,
+   * and this is where it is kept. Absent on native, where the URI is the whole
+   * of what the platform needs.
+   */
+  blob?: Blob;
 };
 
 /** Media as the feed returns it, once hosted. */
@@ -249,6 +259,30 @@ function isLocalFile(value: unknown): value is LocalFile {
   );
 }
 
+/**
+ * Put a picked file into a `FormData` in the way this platform can carry it.
+ *
+ * Two different things, because the platforms hand a file over differently:
+ *
+ *   - Web has the bytes already, as the DOM `File` the picker returned. It has
+ *     to be used, because `expo-file-system` is not implemented on web — `new
+ *     File(uri)` there is a stub that warns to the console and carries nothing,
+ *     so the upload arrives with no file and the server answers 422. The name is
+ *     restated because a `Blob` does not carry one.
+ *   - Native has a URI, which `expo-file-system`'s `File` wraps. It has to be
+ *     that wrapper rather than the picker's `{ uri, name, type }`: Expo installs
+ *     a WinterCG `fetch`, and its encoder takes only a string, a `Blob`, or
+ *     something with `bytes()` — the bare object throws "Unsupported
+ *     FormDataPart implementation" before the request is ever sent.
+ *
+ * Exported because stories and avatars upload the same way and must not each
+ * work this out again.
+ */
+export function appendUpload(form: FormData, key: string, file: LocalFile): void {
+  if (file.blob) form.append(key, file.blob, file.name);
+  else form.append(key, new File(file.uri) as unknown as Blob);
+}
+
 function append(form: FormData, key: string, value: unknown): void {
   if (value === undefined || value === null) return;
 
@@ -256,14 +290,8 @@ function append(form: FormData, key: string, value: unknown): void {
   // object, so a naive encoder walks into it and emits media[0][uri],
   // media[0][name], media[0][type] — three harmless strings, and the server
   // sees no upload at all.
-  //
-  // The file is handed over as a `File`, not as the `{ uri, name, type }` shape
-  // React Native's own FormData takes. Expo installs a WinterCG `fetch` as the
-  // global, and its encoder accepts only a string, a Blob, or something with
-  // `bytes()` — the bare object throws "Unsupported FormDataPart implementation"
-  // before the request is ever sent.
   if (isLocalFile(value)) {
-    form.append(key, new File(value.uri) as unknown as Blob);
+    appendUpload(form, key, value);
     return;
   }
 

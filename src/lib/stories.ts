@@ -1,7 +1,5 @@
-import { File } from 'expo-file-system';
-
 import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api';
-import type { LocalFile, Page } from '@/lib/posts';
+import { appendUpload, type LocalFile, type Page } from '@/lib/posts';
 
 /**
  * A person as every list hands them over — follow lists, feed authors, comment
@@ -234,11 +232,10 @@ export function fetchFollows(
  */
 export async function createStory(image: LocalFile, caption: string, token: string) {
   const form = new FormData();
-  // The picker's `{ uri, name, type }` is not what Expo's WinterCG FormData
-  // accepts — it takes a string, a Blob, or something with `bytes()`. The same
-  // `File` wrapper the post upload uses is what makes this a real upload rather
-  // than three stringified fields.
-  form.append('image', new File(image.uri) as unknown as Blob);
+  // Handed over the same way a post's media is, which is per-platform — see
+  // `appendUpload`. Doing it by hand here is what left the web build uploading
+  // nothing at all.
+  appendUpload(form, 'image', image);
 
   const trimmed = caption.trim();
   if (trimmed) form.append('caption', trimmed);

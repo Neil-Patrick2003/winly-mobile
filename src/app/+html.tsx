@@ -33,7 +33,56 @@ export default function Root({ children }: PropsWithChildren) {
           name="viewport"
           content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
         />
+
+        {/*
+          What makes the export installable.
+
+          Everything referenced here lives in `public/`, which is copied to the
+          root of `dist` untouched — so these are absolute paths to real files
+          rather than anything Metro has bundled and hashed.
+        */}
+        <meta
+          name="description"
+          content="Share your self-care, celebrate small wins, and grow together."
+        />
+        <link rel="manifest" href="/manifest.json" />
+        {/* The green the splash screen and the primary button already wear, so
+            the browser chrome matches the app it is framing. */}
+        <meta name="theme-color" content="#22C55E" />
+
+        {/* iOS reads none of the manifest: standalone mode, the home-screen
+            icon and the name under it are all still declared with these. */}
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Winly" />
+        <link rel="apple-touch-icon" href="/icons/pwa-192.png" />
+
         <ScrollViewStyleReset />
+
+        {/*
+          Registered from an inline script rather than from the app, because it
+          has to happen whether or not the bundle ever finishes loading — the
+          offline shell is exactly what a device that cannot fetch the bundle
+          needs.
+
+          Guarded on `serviceWorker` being present: it is absent on http:// over
+          a LAN address, which is how the dev build is usually reached, and
+          absent in a few browsers besides.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function () {
+                  navigator.serviceWorker.register('/sw.js').catch(function () {
+                    // Nothing to do: the app runs the same, just not offline.
+                  });
+                });
+              }
+            `,
+          }}
+        />
       </head>
       <body>{children}</body>
     </html>

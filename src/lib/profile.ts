@@ -1,8 +1,6 @@
-import { File } from 'expo-file-system';
-
 import { apiGet, apiPatch, apiPost } from '@/lib/api';
 import type { User } from '@/lib/auth';
-import type { LocalFile } from '@/lib/posts';
+import { appendUpload, type LocalFile } from '@/lib/posts';
 
 /** What `UpdateProfileRequest` accepts. Every field is optional — it patches. */
 export type ProfileUpdate = {
@@ -57,9 +55,9 @@ export async function updateProfile(input: ProfileUpdate, token: string) {
   }
 
   if (avatar) {
-    // The picker's `{ uri, name, type }` is not what Expo's WinterCG FormData
-    // accepts — it takes a string, a Blob, or something with `bytes()`.
-    form.append('avatar', new File(avatar.uri) as unknown as Blob);
+    // Per-platform — see `appendUpload`. On web the picker's DOM `File` is the
+    // only thing there is to send; `expo-file-system` has no web build.
+    appendUpload(form, 'avatar', avatar);
   } else {
     form.append('remove_avatar', '1');
   }
