@@ -494,7 +494,7 @@ export function PostCard({
   const detail = variant === 'detail';
   const { user, token } = useAuth();
   const {
-    followedIds,
+    followState,
     setFollowed,
     savedPostIds,
     toggleSaved,
@@ -570,7 +570,10 @@ export function PostCard({
     }
   };
 
-  const following = followedIds.has(author.id);
+  // What this session settled, then what the row itself said. The feed seeds
+  // the map from every page it loads, so the fallback is mostly for a card
+  // shown outside it — a circle's wall, or a post opened on its own.
+  const following = followState.get(author.id) ?? author.is_following ?? false;
   const saved = savedPostIds.has(post.id);
   // Following yourself is a 422, so your own posts simply do not offer it.
   const isMine = user?.id === author.id;

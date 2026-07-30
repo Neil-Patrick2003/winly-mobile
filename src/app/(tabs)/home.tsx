@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -17,7 +17,6 @@ import { ImageWithPlaceholder, Image } from '@/components/ui/image';
 import { SegmentedRing } from '@/components/ui/segmented-ring';
 import { BottomTabInset, Colors } from '@/constants/theme';
 import { useAuth } from '@/lib/auth-context';
-import { FEED_TABS, type FeedTab } from '@/lib/home-data';
 import { useFeed } from '@/lib/feed-context';
 import { WIN_KINDS, type WeekProgress } from '@/lib/progress';
 import { useWeekProgress } from '@/lib/use-week-progress';
@@ -165,7 +164,6 @@ function WeeklyProgress({
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const [tab, setTab] = useState<FeedTab>('Following');
   const { posts, error, loading, loadingMore, refreshing, hasMore, refresh, loadMore } = useFeed();
   const {
     week,
@@ -274,39 +272,15 @@ export default function HomeScreen() {
 
       <WeeklyProgress week={week} loading={weekLoading} error={weekError} />
 
-    {/* The head of the feed's card: the filter sits on top of the posts rather
-        than floating above them, so the whole newsfeed reads as one surface.
-        Rounded at the top only — the list continues it, and the footer closes
-        it off.
+      {/* The head of the feed's card, and now the whole of it: rounded at the
+          top only, since the list continues it and the footer closes it off.
 
-        The tabs are presentational for now: the feed endpoint takes only
-        `per_page` and `cursor`, with no audience filter, so all three show
-        the same posts. */}
-    <View className="mx-4 mt-4 flex-row gap-5 rounded-t-3xl bg-surface-card px-4">
-      {FEED_TABS.map((item) => {
-        const active = item === tab;
-        return (
-          <Pressable
-            key={item}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: active }}
-            onPress={() => setTab(item)}
-            className="py-4 active:opacity-70">
-            <Text
-              className={`text-base leading-6 ${
-                active ? 'font-body-semibold' : 'font-sans text-ink-muted'
-              }`}
-              style={active ? { color: GREEN } : undefined}>
-              {item}
-            </Text>
-            <View
-              className="absolute inset-x-0 bottom-0 h-[3px] rounded-t-full"
-              style={{ backgroundColor: active ? GREEN : 'transparent' }}
-            />
-          </Pressable>
-        );
-      })}
-    </View>
+          It is all that is left of the For You / Following / Circles filter,
+          which sat here until the tabs came out. They were presentational —
+          the feed endpoint takes `per_page` and `cursor` and nothing else, so
+          all three showed the same posts — but the card still needs its top
+          edge, and the posts below would otherwise begin on a square one. */}
+      <View className="mx-4 mt-4 h-5 rounded-t-3xl bg-surface-card" />
     </View>
   );
 

@@ -26,18 +26,21 @@ const TABS: { key: Relation; label: string }[] = [
 function PersonRow({ person }: { person: UserSummary }) {
   const theme = useTheme();
   const { token, user } = useAuth();
-  const { followedIds, setFollowed } = useFeed();
+  const { followState, setFollowed } = useFeed();
   const showToast = useToast();
   const [busy, setBusy] = useState(false);
 
   const isSelf = person.id === user?.id;
   /*
-   * The shared set first, then what the page reported.
+   * What this session settled, and only failing that what the page reported.
    *
-   * The same person can appear on both tabs and in the feed behind this
-   * screen; following them in one place has to move every other.
+   * The same person can appear on both tabs and in the feed behind this screen;
+   * following them in one place has to move every other. It has to be `??` and
+   * not `||`: an unfollow is a `false` here, and OR-ing it against a payload
+   * that still says `is_following: true` — as the row it was loaded with always
+   * will — kept the badge on Following and made the tap look ignored.
    */
-  const isFollowing = followedIds.has(person.id) || person.is_following;
+  const isFollowing = followState.get(person.id) ?? person.is_following;
 
   const toggle = async () => {
     if (!token || busy) return;

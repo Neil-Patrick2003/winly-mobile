@@ -60,15 +60,19 @@ type FeedValue = {
   postEdits: Readonly<Record<string, Post>>;
   replacePost: (post: Post) => void;
   /**
-   * Authors the viewer follows, as far as this session knows.
+   * Where the viewer stands with each author, as far as this session knows.
    *
-   * Seeded empty, because the feed does not say: `UserSummaryResource` carries
-   * no `is_following`, so a post by someone already followed still offers to
-   * follow them. That is harmless — the endpoint is idempotent and will not
-   * double-count — but it is why this cannot be trusted as the truth, only as
-   * what the viewer has done since the app opened.
+   * A map rather than a set of the followed, because absent has to go on
+   * meaning "nothing known". Not every endpoint reports `is_following`, so a
+   * screen holding one of its own has to be able to tell a decision taken here
+   * from a question never asked — and a set can only ever say one of the two.
+   *
+   * That is what a following badge reads, in front of whatever its own payload
+   * said: an entry here is the later answer. Recording an unfollow by dropping
+   * the id instead left the payload's stale `is_following: true` to win, so the
+   * badge stayed on Following and the tap read as ignored.
    */
-  followedIds: ReadonlySet<string>;
+  followState: ReadonlyMap<string, boolean>;
   setFollowed: (userId: string, following: boolean) => void;
   /**
    * Posts the viewer has saved.
@@ -141,7 +145,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [followedIds, setFollowedIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [followState, setFollowState] = useState<ReadonlyMap<string, boolean>>(() => new Map());
   const [savedPostIds, setSavedPostIds] = useState<ReadonlySet<string>>(() => new Set());
   const [composingPostId, setComposingPost] = useState<string | null>(null);
   const [postState, setPostState] = useState<Record<string, PostInteraction>>({});
@@ -174,25 +178,26 @@ export function FeedProvider({ children }: { children: ReactNode }) {
    * exactly as it was — an older server that does not send the field must not
    * silently unfollow everyone on screen.
    *
-   * A reset — first load or pull-to-refresh — rebuilds the set from scratch, so
+   * A reset — first load or pull-to-refresh — rebuilds the map from scratch, so
    * a follow undone elsewhere (another device, or a row deleted straight out of
    * the database) is picked up rather than remembered forever. Loading a further
    * page only adds to it, since those posts say nothing about authors already
    * seen.
    */
   const applyFollowState = useCallback((page: Post[], reset: boolean) => {
-    setFollowedIds((previous) => {
-      const next = new Set(reset ? [] : previous);
+    setFollowState((previous) => {
+      const next = reset ? new Map<string, boolean>() : new Map(previous);
 
       for (const { author } of page) {
         if (author.is_following === undefined) {
-          // Unknown: keep whatever was already believed about them.
-          if (previous.has(author.id)) next.add(author.id);
+          // Unknown: keep whatever was already believed about them, and go on
+          // believing nothing where there was nothing.
+          const held = previous.get(author.id);
+          if (held !== undefined) next.set(author.id, held);
           continue;
         }
 
-        if (author.is_following) next.add(author.id);
-        else next.delete(author.id);
+        next.set(author.id, author.is_following);
       }
 
       return next;
@@ -260,12 +265,11 @@ export function FeedProvider({ children }: { children: ReactNode }) {
   }, [load]);
 
   const setFollowed = useCallback((userId: string, following: boolean) => {
-    setFollowedIds((previous) => {
-      if (previous.has(userId) === following) return previous;
+    setFollowState((previous) => {
+      if (previous.get(userId) === following) return previous;
 
-      const next = new Set(previous);
-      if (following) next.add(userId);
-      else next.delete(userId);
+      const next = new Map(previous);
+      next.set(userId, following);
       return next;
     });
   }, []);
@@ -399,7 +403,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
       restorePost,
       postEdits,
       replacePost,
-      followedIds,
+      followState,
       setFollowed,
       savedPostIds,
       toggleSaved,
@@ -424,7 +428,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
       restorePost,
       postEdits,
       replacePost,
-      followedIds,
+      followState,
       setFollowed,
       savedPostIds,
       toggleSaved,

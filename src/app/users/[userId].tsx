@@ -151,7 +151,7 @@ export default function UserProfileScreen() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const { token } = useAuth();
-  const { followedIds, setFollowed } = useFeed();
+  const { followState, setFollowed } = useFeed();
   const showToast = useToast();
 
   const [profile, setProfile] = useState<PublicProfile | null>(null);
@@ -242,12 +242,15 @@ export default function UserProfileScreen() {
   }, [load]);
 
   /*
-   * Follow state is read from the feed's shared set first.
+   * What this session settled is read first, and the profile's own field only
+   * where it has settled nothing.
    *
    * The same person's card may be sitting in the feed behind this screen, and
-   * the two must not disagree — following here has to move the badge there.
+   * the two must not disagree — following here has to move the badge there. It
+   * has to be `??` and not `||`: an unfollow is a `false`, and OR-ing it against
+   * a profile still saying `is_following: true` left the badge on Following.
    */
-  const isFollowing = profile ? followedIds.has(profile.id) || (profile.is_following ?? false) : false;
+  const isFollowing = profile ? (followState.get(profile.id) ?? profile.is_following ?? false) : false;
 
   const toggleFollow = useCallback(async () => {
     if (!token || !profile || following) return;
