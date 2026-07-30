@@ -17,9 +17,11 @@ import { MenuButton, type MenuItem } from '@/components/ui/menu';
 import { Colors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
+import { confirmDestructive } from '@/lib/confirm';
 import { useFeed } from '@/lib/feed-context';
 import {
   createComment,
+  deletePost,
   humanizeMovementType,
   setFollowing as setFollowingRemote,
   setLiked as setLikedRemote,
@@ -28,6 +30,7 @@ import {
   type Post,
   type Win,
 } from '@/lib/posts';
+import { goBack } from '@/lib/navigation';
 import { timeAgo } from '@/lib/time';
 import { useToast } from '@/lib/toast';
 
@@ -444,6 +447,18 @@ const SAVED_ICON = {
   web: 'bookmark',
 } as const;
 
+const EDIT_ICON = {
+  ios: 'square.and.pencil',
+  android: 'edit',
+  web: 'edit',
+} as const;
+
+const DELETE_ICON = {
+  ios: 'trash',
+  android: 'delete',
+  web: 'delete',
+} as const;
+
 /** Outline until liked, filled after — shape carries the state, not just colour. */
 const LIKE_ICON = {
   ios: 'heart',
@@ -469,9 +484,14 @@ const LIKED_ICON = {
  * attachment is shown at full width, and the comment count stops being a link
  * because the comments are already underneath it.
  */
-export function PostCard({ post, variant = 'feed' }: { post: Post; variant?: 'feed' | 'detail' }) {
+export function PostCard({
+  post: incoming,
+  variant = 'feed',
+}: {
+  post: Post;
+  variant?: 'feed' | 'detail';
+}) {
   const detail = variant === 'detail';
-  const { author, wins } = post;
   const { user, token } = useAuth();
   const {
     followedIds,
@@ -483,7 +503,22 @@ export function PostCard({ post, variant = 'feed' }: { post: Post; variant?: 'fe
     postState,
     composingPostId,
     setComposingPost,
+    deletedPostIds,
+    postEdits,
+    removePost,
+    restorePost,
   } = useFeed();
+
+  /*
+   * The post as it stands, which is not always the one handed in.
+   *
+   * An edit made on the edit screen has to show up wherever the post is being
+   * drawn, and most of those lists belong to a screen rather than to the feed.
+   * Same reasoning as the counter overrides below: the record follows the post,
+   * not the list it happens to be in.
+   */
+  const post = postEdits[incoming.id] ?? incoming;
+  const { author, wins } = post;
   const showToast = useToast();
   const theme = useTheme();
 
@@ -606,6 +641,37 @@ export function PostCard({ post, variant = 'feed' }: { post: Post; variant?: 'fe
     }
   };
 
+  /**
+   * Take the post down, once its author has said so twice.
+   *
+   * Removed from view before the request rather than after, because a card
+   * that sits there until the network answers reads as a button that did
+   * nothing. Put back if the server disagrees.
+   */
+  const onDelete = async () => {
+    if (!token) return;
+
+    const confirmed = await confirmDestructive({
+      title: 'Delete this post?',
+      message: 'The wins on it, and any photos, go with it. This cannot be undone.',
+    });
+
+    if (!confirmed) return;
+
+    removePost(post.id);
+
+    try {
+      await deletePost(post.id, token);
+      showToast('Post deleted');
+
+      // Nothing left to look at on the post's own screen.
+      if (detail) goBack();
+    } catch (caught) {
+      restorePost(post.id);
+      showToast(caught instanceof Error ? caught.message : 'That did not go through.');
+    }
+  };
+
   const items: MenuItem[] = [
     ...(isMine
       ? []
@@ -624,6 +690,22 @@ export function PostCard({ post, variant = 'feed' }: { post: Post; variant?: 'fe
         showToast(saved ? 'Removed from saved' : 'Post saved');
       },
     },
+    ...(isMine
+      ? [
+          {
+            label: 'Edit post',
+            icon: EDIT_ICON,
+            onPress: () =>
+              router.push({ pathname: '/posts/[postId]/edit', params: { postId: post.id } }),
+          },
+          {
+            label: 'Delete post',
+            icon: DELETE_ICON,
+            destructive: true,
+            onPress: () => void onDelete(),
+          },
+        ]
+      : []),
   ];
 
   // The substance of a learning win is its text, which is too long for a pill.
@@ -635,6 +717,10 @@ export function PostCard({ post, variant = 'feed' }: { post: Post; variant?: 'fe
   /** Open this post on its own screen, where the whole thread lives. */
   const openPost = () =>
     router.push({ pathname: '/comments/[postId]', params: { postId: post.id } });
+
+  // Below every hook, so this stays a plain early return rather than a
+  // conditional hook. A deleted post leaves no gap in whatever list it was in.
+  if (deletedPostIds.has(post.id)) return null;
 
   return (
     <View

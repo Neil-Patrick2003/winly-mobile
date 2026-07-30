@@ -1,4 +1,5 @@
 import { useGlobalSearchParams } from 'expo-router';
+import type { SymbolViewProps } from 'expo-symbols';
 import { createContext, use, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { useAuth } from '@/lib/auth-context';
@@ -40,11 +41,41 @@ export type LearningDraft = {
 };
 
 /**
- * The `activity` value standing for "none of the chips". Kept here rather than
- * with the chip list because Review has to recognise it too, and read the
- * free-text field instead of showing the sentinel.
+ * The `activity` value standing for "none of the chips". Kept beside the list
+ * itself because Review has to recognise it too, and read the free-text field
+ * instead of showing the sentinel.
  */
 export const OTHER_ACTIVITY = 'Others';
+
+/**
+ * The shortlist, not an exhaustive taxonomy — "Others" opens a box for whatever
+ * is missing. Labels are the stored value, so renaming one orphans the drafts
+ * that chose it.
+ *
+ * Lives here rather than on the Movement step because editing a post offers the
+ * same choice, and two lists of chips would drift into disagreeing about what a
+ * movement win may be.
+ */
+export const ACTIVITIES: { label: string; icon: SymbolViewProps['name'] }[] = [
+  { label: 'Morning Walk', icon: { ios: 'figure.walk', android: 'directions_walk', web: 'directions_walk' } },
+  { label: 'Run', icon: { ios: 'figure.run', android: 'directions_run', web: 'directions_run' } },
+  { label: 'Yoga', icon: { ios: 'figure.yoga', android: 'self_improvement', web: 'self_improvement' } },
+  { label: 'Gym', icon: { ios: 'dumbbell', android: 'fitness_center', web: 'fitness_center' } },
+  { label: 'Stretching', icon: { ios: 'figure.flexibility', android: 'accessibility_new', web: 'accessibility_new' } },
+  { label: 'Cycling', icon: { ios: 'bicycle', android: 'directions_bike', web: 'directions_bike' } },
+  { label: OTHER_ACTIVITY, icon: { ios: 'ellipsis', android: 'more_horiz', web: 'more_horiz' } },
+];
+
+/**
+ * Whether a movement answer stands up: a chip, and — since "Others" is not an
+ * answer on its own — the words that go with it.
+ *
+ * Shared with the edit screen, which holds a movement win to the same bar the
+ * step that wrote it did.
+ */
+export function isMovementAnswered(activity: string | null, otherActivity: string) {
+  return activity !== null && (activity !== OTHER_ACTIVITY || otherActivity.trim().length > 0);
+}
 
 export type MovementDraft = {
   /** One of the ACTIVITIES labels on the Movement step, or OTHER_ACTIVITY. */

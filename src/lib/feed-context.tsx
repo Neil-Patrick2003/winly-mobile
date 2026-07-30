@@ -37,6 +37,29 @@ type FeedValue = {
   /** Put a just-created post at the top without going back to the server. */
   prepend: (post: Post) => void;
   /**
+   * Posts the reader has deleted this session.
+   *
+   * Recorded here rather than only dropped from `posts`, for the same reason
+   * `postState` exists: a post is drawn from whichever list it was fetched
+   * into — the feed's, a circle's wall, a profile — and only the feed's list
+   * lives here. Deleting from a circle wall would otherwise leave the card on
+   * screen until a refresh. The card reads this set and stops drawing itself,
+   * so one record covers every surface.
+   */
+  deletedPostIds: ReadonlySet<string>;
+  removePost: (postId: string) => void;
+  /** Put a post back after a delete the server refused. */
+  restorePost: (postId: string) => void;
+  /**
+   * Posts as they stand after being edited, keyed by id.
+   *
+   * The counterpart to `deletedPostIds`, and there for the same reason: the
+   * edited post has to replace the old one wherever it is being shown, not
+   * only in the one list this context owns.
+   */
+  postEdits: Readonly<Record<string, Post>>;
+  replacePost: (post: Post) => void;
+  /**
    * Authors the viewer follows, as far as this session knows.
    *
    * Seeded empty, because the feed does not say: `UserSummaryResource` carries
@@ -315,6 +338,36 @@ export function FeedProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const [deletedPostIds, setDeletedPostIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [postEdits, setPostEdits] = useState<Readonly<Record<string, Post>>>({});
+
+  /*
+   * Marked rather than spliced out.
+   *
+   * The list is left as it was so that a delete the server refuses can be put
+   * back exactly where it stood — filtering it out here would lose its place,
+   * and re-inserting would guess at the order. What the reader sees is the
+   * filtered view below; this set is the record.
+   */
+  const removePost = useCallback((postId: string) => {
+    setDeletedPostIds((previous) => new Set(previous).add(postId));
+  }, []);
+
+  const restorePost = useCallback((postId: string) => {
+    setDeletedPostIds((previous) => {
+      if (!previous.has(postId)) return previous;
+
+      const next = new Set(previous);
+      next.delete(postId);
+      return next;
+    });
+  }, []);
+
+  const replacePost = useCallback((post: Post) => {
+    setPostEdits((previous) => ({ ...previous, [post.id]: post }));
+    setPosts((previous) => previous.map((item) => (item.id === post.id ? post : item)));
+  }, []);
+
   const prepend = useCallback((post: Post) => {
     // Guarded against a refresh having already raced it in, which would
     // otherwise show the same post twice.
@@ -323,9 +376,16 @@ export function FeedProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  // What the feed draws: everything still standing. Deleting a post takes it
+  // off screen at once, without the list having to be rebuilt to do it.
+  const visible = useMemo(
+    () => posts.filter((post) => !deletedPostIds.has(post.id)),
+    [posts, deletedPostIds]
+  );
+
   const value = useMemo<FeedValue>(
     () => ({
-      posts,
+      posts: visible,
       error,
       loading,
       loadingMore,
@@ -334,6 +394,11 @@ export function FeedProvider({ children }: { children: ReactNode }) {
       refresh,
       loadMore,
       prepend,
+      deletedPostIds,
+      removePost,
+      restorePost,
+      postEdits,
+      replacePost,
       followedIds,
       setFollowed,
       savedPostIds,
@@ -345,7 +410,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
       setComposingPost,
     }),
     [
-      posts,
+      visible,
       error,
       loading,
       loadingMore,
@@ -354,6 +419,11 @@ export function FeedProvider({ children }: { children: ReactNode }) {
       refresh,
       loadMore,
       prepend,
+      deletedPostIds,
+      removePost,
+      restorePost,
+      postEdits,
+      replacePost,
       followedIds,
       setFollowed,
       savedPostIds,

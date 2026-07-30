@@ -1,5 +1,4 @@
 import { router } from 'expo-router';
-import type { SymbolViewProps } from 'expo-symbols';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 
 import {
@@ -13,34 +12,15 @@ import {
 import { Chip } from '@/components/ui/chip';
 import { MediaPicker } from '@/components/ui/media-picker';
 import { TextArea } from '@/components/ui/text-area';
-import { OTHER_ACTIVITY, useEntryDraft } from '@/lib/entry-draft';
+import {
+  ACTIVITIES,
+  isMovementAnswered as isAnswered,
+  OTHER_ACTIVITY,
+  useEntryDraft,
+} from '@/lib/entry-draft';
 import { goBack } from '@/lib/navigation';
 
 const THEME = PILLAR_THEME.movement;
-
-/**
- * The shortlist, not an exhaustive taxonomy — "Others" opens a box for whatever
- * is missing. Labels are the stored value, so renaming one orphans the drafts
- * that chose it.
- */
-const ACTIVITIES: { label: string; icon: SymbolViewProps['name'] }[] = [
-  { label: 'Morning Walk', icon: { ios: 'figure.walk', android: 'directions_walk', web: 'directions_walk' } },
-  { label: 'Run', icon: { ios: 'figure.run', android: 'directions_run', web: 'directions_run' } },
-  { label: 'Yoga', icon: { ios: 'figure.yoga', android: 'self_improvement', web: 'self_improvement' } },
-  { label: 'Gym', icon: { ios: 'dumbbell', android: 'fitness_center', web: 'fitness_center' } },
-  { label: 'Stretching', icon: { ios: 'figure.flexibility', android: 'accessibility_new', web: 'accessibility_new' } },
-  { label: 'Cycling', icon: { ios: 'bicycle', android: 'directions_bike', web: 'directions_bike' } },
-  { label: OTHER_ACTIVITY, icon: { ios: 'ellipsis', android: 'more_horiz', web: 'more_horiz' } },
-];
-
-/**
- * Whether the step counts as answered: a chip, and — since "Others" is not an
- * answer on its own — the words that go with it. Naming an activity is the same
- * act as completing the step, so this decides both.
- */
-function isAnswered(activity: string | null, otherActivity: string) {
-  return activity !== null && (activity !== OTHER_ACTIVITY || otherActivity.trim().length > 0);
-}
 
 /** Step 3, and the last one before Review. */
 export default function MovementStepScreen() {

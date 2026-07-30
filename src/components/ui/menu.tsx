@@ -8,6 +8,14 @@ export type MenuItem = {
   label: string;
   icon: SymbolViewProps['name'];
   onPress: () => void;
+  /**
+   * Draws the row in the danger colour.
+   *
+   * For actions that take something away and do not give it back. The colour is
+   * the only warning a menu row can carry, and it is worth having on the row
+   * that is next to "Save post" and one slip away from it.
+   */
+  destructive?: boolean;
 };
 
 const MENU_WIDTH = 224;
@@ -17,6 +25,12 @@ const MENU_PADDING = 10;
 /** Breathing room from the trigger, and from the edge of the screen. */
 const GAP = 6;
 const EDGE = 12;
+/**
+ * Tailwind's `red-500`, matching the `text-red-500` the forms already use for
+ * things that have gone wrong. Spelled out because the icon takes a colour
+ * rather than a class, and there is no danger token in the theme to read.
+ */
+const DANGER = '#EF4444';
 
 /**
  * A button that opens a short list of actions anchored beneath it.
@@ -113,8 +127,16 @@ export function MenuButton({
                 }}
                 style={{ height: ROW_HEIGHT }}
                 className="flex-row items-center gap-3 px-4 active:bg-surface-selected">
-                <SymbolView name={item.icon} size={17} tintColor={theme.text} />
-                <Text numberOfLines={1} className="flex-1 font-sans text-[15px] leading-5 text-ink">
+                <SymbolView
+                  name={item.icon}
+                  size={17}
+                  tintColor={item.destructive ? DANGER : theme.text}
+                />
+                <Text
+                  numberOfLines={1}
+                  className={`flex-1 font-sans text-[15px] leading-5 ${
+                    item.destructive ? 'text-red-500' : 'text-ink'
+                  }`}>
                   {item.label}
                 </Text>
               </Pressable>

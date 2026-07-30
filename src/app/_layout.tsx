@@ -116,6 +116,9 @@ function RootNavigator() {
       {/* Pushed from a feed card's comment count, so it reads as going one
           level into that post rather than as a separate place. */}
       <Stack.Screen name="comments/[postId]" />
+      {/* Rewriting a post is a task you finish or abandon, like editing your
+          own details — so a modal, and for the same reason. */}
+      <Stack.Screen name="posts/[postId]/edit" options={{ presentation: 'modal' }} />
       {/* Stories take the whole screen and are watched, not navigated: the
           fade keeps the rail from sliding away under them, and composing one
           is a modal because it is a task you finish or abandon. */}

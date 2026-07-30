@@ -222,6 +222,21 @@ export function toMovementType(label: string, freeText = ''): MovementType {
   return slug || 'other';
 }
 
+/**
+ * The chip label a stored `movement_type` was written by, or null where no chip
+ * writes it.
+ *
+ * The inverse of `toMovementType` across the labels it knows, so a win logged as
+ * `walk` selects Morning Walk again when it is edited. Null is the answer for a
+ * typed activity — which went out as itself rather than through a chip — and is
+ * what tells a caller to put it back under "Others", where it was written.
+ */
+export function fromMovementType(value: MovementType): string | null {
+  const match = Object.entries(MOVEMENT_TYPES).find(([, known]) => known === value);
+
+  return match?.[0] ?? null;
+}
+
 /** "cycling" → "Cycling", "morning_walk" → "Morning walk". */
 export function humanizeMovementType(value: MovementType) {
   const spaced = value.replace(/_/g, ' ');
@@ -274,13 +289,34 @@ function append(form: FormData, key: string, value: unknown): void {
 }
 
 /** Flatten a post into the bracketed field names the multipart endpoint wants. */
-export function toFormData(input: CreatePostInput): FormData {
+export function toFormData(input: CreatePostInput | UpdatePostInput): FormData {
   const form = new FormData();
   for (const [key, value] of Object.entries(input)) append(form, key, value);
   return form;
 }
 
-const hasFiles = (input: CreatePostInput) => input.wins.some((win) => (win.media?.length ?? 0) > 0);
+/**
+ * What an edit sends.
+ *
+ * The same shape as creating, because the server reads it the same way: `wins`
+ * says what the post should end up being rather than what changed, so a kind
+ * left out of the list is a kind being removed.
+ *
+ * `media` is the files being added. What the win already holds stays unless its
+ * id is named in `remove_media_ids`.
+ */
+export type UpdateWin = NewWin & { remove_media_ids?: string[] };
+
+export type UpdatePostInput = {
+  caption?: string;
+  /** At least one — the last win cannot be edited away, only deleted. */
+  wins: UpdateWin[];
+  /** Omit to leave the sharing alone; an empty list unshares from every circle. */
+  circle_ids?: string[];
+};
+
+const hasFiles = (input: CreatePostInput | UpdatePostInput) =>
+  input.wins.some((win) => (win.media?.length ?? 0) > 0);
 
 /**
  * POST /api/v1/posts — creates the post and returns it under `data`.
@@ -298,6 +334,31 @@ export async function createPost(input: CreatePostInput, token: string) {
   );
 
   return response.data;
+}
+
+/**
+ * PATCH /api/v1/posts/{id} — rewrites the post and returns it under `data`.
+ *
+ * Sent as a POST carrying `_method` when there are files, because a multipart
+ * body only travels on a POST. Laravel resolves that before routing, so it
+ * still arrives at the PATCH route.
+ */
+export async function updatePost(postId: string, input: UpdatePostInput, token: string) {
+  if (!hasFiles(input)) {
+    const response = await apiPatch<{ data: Post }>(`/api/v1/posts/${postId}`, input, token);
+    return response.data;
+  }
+
+  const form = toFormData(input);
+  form.append('_method', 'PATCH');
+
+  const response = await apiPost<{ data: Post }>(`/api/v1/posts/${postId}`, form, token);
+  return response.data;
+}
+
+/** DELETE /api/v1/posts/{id} — takes the post down, media and all. */
+export async function deletePost(postId: string, token: string) {
+  await apiDelete<{ data: { id: string } }>(`/api/v1/posts/${postId}`, token);
 }
 
 /**
