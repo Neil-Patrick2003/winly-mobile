@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PILLAR_THEME } from '@/components/entry-chrome';
+import { ProfileCover } from '@/components/profile-cover';
 import { ImageWithPlaceholder } from '@/components/ui/image';
 import { Colors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -320,10 +321,7 @@ export default function UserProfileScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.primary} />
         }>
-        <View
-          className="bg-linear-to-r from-green-400 via-sky-400 to-violet-400"
-          style={{ height: insets.top + 128 }}
-        />
+        <ProfileCover uri={profile.cover_url} height={insets.top + 128} />
 
         <View className="-mt-12 flex-row items-end justify-between px-4">
           <View>

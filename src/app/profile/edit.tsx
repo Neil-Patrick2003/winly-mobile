@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useResolveClassNames } from 'uniwind';
 
+import { ProfileCover } from '@/components/profile-cover';
 import { ImageWithPlaceholder } from '@/components/ui/image';
 import { useKeyboardVisible } from '@/hooks/use-keyboard-visible';
 import { useTheme } from '@/hooks/use-theme';
@@ -91,12 +92,26 @@ export default function EditProfileScreen() {
    * down, and a file means a new one is waiting to go up.
    */
   const [avatar, setAvatar] = useState<LocalFile | null | undefined>(undefined);
+  /*
+   * The banner, on the same three-way terms as the avatar: undefined is "not
+   * touched", null is "take it down", a file is "use this". Anything else would
+   * make an edit that only changed the name send instructions about a photo.
+   */
+  const [cover, setCover] = useState<LocalFile | null | undefined>(undefined);
 
-  const [preparing, setPreparing] = useState(false);
+  // Which photo is being prepared, so only the one that was tapped spins.
+  const [preparing, setPreparing] = useState<'avatar' | 'cover' | null>(null);
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const pick = async () => {
+  /**
+   * Pick either photo.
+   *
+   * One function because the two differ in exactly two things — the crop the
+   * picker offers, and where the result is put — and everything around them,
+   * the permission, the shrink and the size cap, is the same work.
+   */
+  const pick = async (kind: 'avatar' | 'cover') => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert(
@@ -109,7 +124,10 @@ export default function EditProfileScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
-      aspect: [1, 1],
+      // Square for the avatar, and roughly the shape the banner is actually
+      // drawn at — cropping to it here is what stops a portrait photo being
+      // centre-cut into something unrecognisable on the profile.
+      aspect: kind === 'avatar' ? [1, 1] : [2, 1],
       quality: 0.8,
     });
 
@@ -118,7 +136,7 @@ export default function EditProfileScreen() {
     const asset = result.assets[0];
     if (!asset) return;
 
-    setPreparing(true);
+    setPreparing(kind);
     try {
       const prepared = await shrinkAsset(asset);
 
@@ -130,9 +148,10 @@ export default function EditProfileScreen() {
         return;
       }
 
-      setAvatar(prepared);
+      if (kind === 'avatar') setAvatar(prepared);
+      else setCover(prepared);
     } finally {
-      setPreparing(false);
+      setPreparing(null);
     }
   };
 
@@ -171,6 +190,7 @@ export default function EditProfileScreen() {
     if (trimmedEmail !== user.email) changes.email = trimmedEmail;
     if (trimmedBio !== (user.bio ?? '')) changes.bio = trimmedBio.length > 0 ? trimmedBio : null;
     if (avatar !== undefined) changes.avatar = avatar;
+    if (cover !== undefined) changes.cover = cover;
 
     if (Object.keys(changes).length === 0) {
       goBack('/(tabs)/profile');
@@ -209,6 +229,7 @@ export default function EditProfileScreen() {
 
   // What the picker holds if it has been touched, otherwise what is stored.
   const shownAvatar = avatar === undefined ? user.avatar_url : (avatar?.uri ?? null);
+  const shownCover = cover === undefined ? user.cover_url : (cover?.uri ?? null);
   const initial = (user.full_name.trim()[0] ?? user.username[0] ?? '?').toUpperCase();
 
   return (
@@ -236,20 +257,58 @@ export default function EditProfileScreen() {
         contentContainerStyle={{ paddingTop: 4, paddingBottom: 24 }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag">
-        {/* The same gradient the profile wears, so editing reads as the same
-            place rather than a form about it. */}
-        <View
-          className="-mx-4 bg-linear-to-r from-green-400 via-sky-400 to-violet-400"
-          style={{ height: 72 }}
-        />
+        {/* The banner the profile actually wears, so editing reads as the same
+            place rather than a form about it — and so what is picked here is
+            seen in the shape it will be seen in. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={shownCover ? 'Change cover photo' : 'Add a cover photo'}
+          accessibilityState={{ busy: preparing === 'cover' }}
+          disabled={preparing !== null || saving}
+          onPress={() => void pick('cover')}
+          className="-mx-4 active:opacity-80">
+          <ProfileCover uri={shownCover} height={96} />
+
+          {/* Sits on the photo, so it carries its own scrim rather than relying
+              on whatever happens to be behind it. */}
+          <View className="absolute bottom-2 right-6 flex-row items-center gap-1.5 rounded-full bg-black/45 px-3 py-1.5">
+            {preparing === 'cover' ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <SymbolView
+                name={{ ios: 'camera.fill', android: 'photo_camera', web: 'photo_camera' }}
+                size={13}
+                tintColor="#FFFFFF"
+              />
+            )}
+            <Text className="font-body-semibold text-[12px] leading-4 text-white">
+              {shownCover ? 'Change cover' : 'Add cover'}
+            </Text>
+          </View>
+        </Pressable>
+
+        {shownCover ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Remove cover photo"
+            disabled={saving}
+            // Null rather than undefined: this is an instruction to take it
+            // down, not silence about it. The gradient shows through again.
+            onPress={() => setCover(null)}
+            className="items-end pt-2 active:opacity-60">
+            <Text className="font-body-semibold text-[13px] leading-[18px] text-ink-muted">
+              Remove cover
+            </Text>
+          </Pressable>
+        ) : null}
 
         <View className="-mt-12 items-center gap-3 pb-2">
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Change profile photo"
-            accessibilityState={{ busy: preparing }}
-            disabled={preparing || saving}
-            onPress={() => void pick()}
+            accessibilityState={{ busy: preparing === 'avatar' }}
+            disabled={preparing !== null || saving}
+            onPress={() => void pick('avatar')}
             className="active:opacity-70">
             <ImageWithPlaceholder
               source={{ uri: shownAvatar }}
@@ -265,7 +324,7 @@ export default function EditProfileScreen() {
             <View
               className="absolute bottom-0 right-0 h-8 w-8 items-center justify-center rounded-full border-2 border-surface"
               style={{ backgroundColor: theme.primary }}>
-              {preparing ? (
+              {preparing === 'avatar' ? (
                 <ActivityIndicator size="small" color={theme.onPrimary} />
               ) : (
                 <SymbolView

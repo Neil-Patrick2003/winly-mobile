@@ -17,6 +17,14 @@ export type ProfileUpdate = {
    * mean different things here.
    */
   avatar?: LocalFile | null;
+  /**
+   * The banner across the top of the profile, on the same terms as `avatar`.
+   *
+   * `null` takes it down and reveals `cover_gradient` again rather than leaving
+   * the header blank — the gradient is what a profile wears until somebody
+   * uploads something, and it is never cleared by this.
+   */
+  cover?: LocalFile | null;
 };
 
 /** Kept in step with `ProfileValidationRules`. */
@@ -38,9 +46,11 @@ export const USERNAME_PATTERN = /^[a-z0-9_]+$/;
  * treats it as the PATCH it claims to be.
  */
 export async function updateProfile(input: ProfileUpdate, token: string) {
-  const { avatar, ...fields } = input;
+  const { avatar, cover, ...fields } = input;
 
-  if (avatar === undefined) {
+  // Nothing said about either photo means nothing to upload, and JSON keeps its
+  // real booleans rather than the "1"/"0" multipart forces.
+  if (avatar === undefined && cover === undefined) {
     const response = await apiPatch<{ data: User }>('/api/v1/profile', fields, token);
     return response.data;
   }
@@ -54,12 +64,22 @@ export async function updateProfile(input: ProfileUpdate, token: string) {
     form.append(key, typeof value === 'boolean' ? (value ? '1' : '0') : String(value ?? ''));
   }
 
-  if (avatar) {
+  /*
+   * Each photo is only spoken about when the caller said something about it.
+   *
+   * `undefined` has to stay silent: sending `remove_cover` on an edit that only
+   * changed the avatar would take down a cover nobody touched.
+   */
+  if (avatar !== undefined) {
     // Per-platform — see `appendUpload`. On web the picker's DOM `File` is the
     // only thing there is to send; `expo-file-system` has no web build.
-    appendUpload(form, 'avatar', avatar);
-  } else {
-    form.append('remove_avatar', '1');
+    if (avatar) appendUpload(form, 'avatar', avatar);
+    else form.append('remove_avatar', '1');
+  }
+
+  if (cover !== undefined) {
+    if (cover) appendUpload(form, 'cover', cover);
+    else form.append('remove_cover', '1');
   }
 
   const response = await apiPost<{ data: User }>('/api/v1/profile', form, token);
@@ -80,6 +100,8 @@ export type PublicProfile = {
   avatar_url: string | null;
   bio: string | null;
   cover_gradient: string;
+  /** The uploaded banner, or null where they have not set one. */
+  cover_url: string | null;
 
   /** Times posted. Not `wins_count`, which counts the wins those posts carry. */
   posts_count: number;

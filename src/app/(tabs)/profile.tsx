@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PILLAR_THEME } from '@/components/entry-chrome';
+import { ProfileCover } from '@/components/profile-cover';
 import { ImageWithPlaceholder } from '@/components/ui/image';
 import { Wordmark } from '@/components/wordmark';
 import { BottomTabInset, Colors } from '@/constants/theme';
@@ -287,10 +288,7 @@ export default function ProfileScreen() {
         }>
         {/* The cover runs up behind the status bar, and the avatar straddles its
             lower edge. */}
-        <View
-          className="bg-linear-to-r from-green-400 via-sky-400 to-violet-400"
-          style={{ height: insets.top + 128 }}
-        />
+        <ProfileCover uri={user.cover_url} height={insets.top + 128} />
 
         <View className="-mt-12 flex-row items-end justify-between px-4">
           <View>

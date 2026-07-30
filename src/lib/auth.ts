@@ -11,6 +11,13 @@ export type User = {
   avatar_url: string | null;
   /** Named gradient preset ("sunrise", …) rather than an uploaded image. */
   cover_gradient: string;
+  /**
+   * The uploaded banner across the top of the profile, or null.
+   *
+   * Sits over `cover_gradient` rather than replacing it: taking the photo
+   * down reveals the gradient again instead of leaving the header blank.
+   */
+  cover_url: string | null;
   streak_days: number;
   /** The best run ever reached, which the profile shows beside the current one. */
   longest_streak: number;
