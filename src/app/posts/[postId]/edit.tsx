@@ -360,8 +360,9 @@ export default function EditPostScreen() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-surface"
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+      // Android only; the scroller below handles iOS. The reasoning is set out
+      // in full on the sign-up screen, which has the same shape.
+      behavior={Platform.OS === 'android' ? 'padding' : undefined}>
       <View
         className="flex-row items-center gap-2 border-b border-hairline bg-surface-card px-4 pb-3"
         style={{ paddingTop: insets.top + 6 }}
@@ -417,6 +418,11 @@ export default function EditPostScreen() {
         <ScrollView
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          // Insets the content by however much the keyboard covers and scrolls
+          // the focused field clear of it. The pillars stack, so the learning
+          // box and the "Others" activity sit low on a post carrying all three
+          // and are buried without this.
+          automaticallyAdjustKeyboardInsets
           contentContainerClassName="w-full max-w-[800px] self-center"
           contentContainerStyle={{
             padding: 16,

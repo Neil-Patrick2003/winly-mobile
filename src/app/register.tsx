@@ -137,161 +137,174 @@ export default function RegisterScreen() {
   };
 
   return (
-    <View className="flex-1 bg-surface">
-      <KeyboardAvoidingView
+    <KeyboardAvoidingView
+      className="flex-1 bg-surface"
+      /*
+       * Android only, and the ScrollView below handles iOS.
+       *
+       * Android needs it because edge-to-edge — on by default since SDK 54 —
+       * stops the window resizing when the keyboard opens, so nothing moves
+       * unless this moves it. iOS must not have it: padding the container
+       * shrinks the scroller's viewport without touching its scroll position,
+       * which is exactly how the last fields on this form — password and its
+       * confirmation — ended up under the keyboard with no sign that anything
+       * was being typed. Applying both would cancel the fix out, since a
+       * scroller already lifted clear of the keyboard has nothing to inset.
+       */
+      behavior={Platform.OS === 'android' ? 'padding' : undefined}>
+      {/* Insets the content by however much the keyboard covers and scrolls the
+          focused field clear of it. iOS only; ignored elsewhere. */}
+      <ScrollView
         className="flex-1"
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView
-          className="flex-1"
-          contentContainerClassName="w-full max-w-[800px] grow self-center px-4"
-          contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 24 }}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag">
+        contentContainerClassName="w-full max-w-[800px] grow self-center px-4"
+        contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 24 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        automaticallyAdjustKeyboardInsets>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          onPress={() => goBack('/')}
+          className="-ml-2 mt-2 self-start p-2 active:opacity-60">
+          <SymbolView
+            name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }}
+            size={18}
+            tintColor={Colors.light.text}
+          />
+        </Pressable>
+
+        <View className="items-center gap-2 pt-4">
+          <Wordmark />
+          <HeartDivider />
+        </View>
+
+        <View className="gap-1 pt-6">
+          <Text className="font-heading-bold text-2xl leading-8 text-ink">
+            Create your account
+          </Text>
+          <Text className="font-sans text-sm leading-5 text-ink-muted">
+            Join Winly and start sharing your journey, celebrating small wins, and inspire others.
+          </Text>
+        </View>
+
+        <View className="gap-2.5 pt-6">
+          <Field
+            icon={{ ios: 'person', android: 'person', web: 'person' }}
+            placeholder="Name"
+            value={fullName}
+            onChangeText={edit('full_name', setFullName)}
+            invalid={Boolean(serverErrors.full_name)}
+            maxLength={255}
+            autoCapitalize="words"
+            autoComplete="name"
+            textContentType="name"
+            returnKeyType="next"
+          />
+          <Field
+            icon={{ ios: 'at', android: 'alternate_email', web: 'alternate_email' }}
+            placeholder="Username"
+            value={username}
+            onChangeText={edit('username', setUsername)}
+            invalid={usernameInvalid || Boolean(serverErrors.username)}
+            maxLength={30}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="username"
+            textContentType="username"
+            returnKeyType="next"
+          />
+          <Field
+            icon={{ ios: 'envelope', android: 'mail', web: 'mail' }}
+            placeholder="Email address"
+            value={email}
+            onChangeText={edit('email', setEmail)}
+            invalid={emailInvalid || Boolean(serverErrors.email)}
+            maxLength={255}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+            textContentType="emailAddress"
+            returnKeyType="next"
+          />
+          <Field
+            icon={{ ios: 'lock', android: 'lock', web: 'lock' }}
+            placeholder="Password"
+            value={password}
+            onChangeText={edit('password', setPassword)}
+            invalid={passwordInvalid || Boolean(serverErrors.password)}
+            secureTextEntry
+            autoCapitalize="none"
+            autoComplete="new-password"
+            textContentType="newPassword"
+            returnKeyType="next"
+          />
+          <Field
+            icon={{ ios: 'checkmark.shield', android: 'verified_user', web: 'verified_user' }}
+            placeholder="Confirm password"
+            value={confirmPassword}
+            onChangeText={edit('password_confirmation', setConfirmPassword)}
+            invalid={mismatch || Boolean(serverErrors.password_confirmation)}
+            secureTextEntry
+            autoCapitalize="none"
+            autoComplete="new-password"
+            textContentType="newPassword"
+            returnKeyType="done"
+            onSubmitEditing={handleSubmit}
+          />
+
+          {error ? (
+            <Text className="px-4 font-sans text-xs leading-4 text-highlight">{error}</Text>
+          ) : null}
+        </View>
+        <View className="mt-2 flex-row items-start gap-2 rounded-lg bg-green-100 p-4">
+          <SymbolView
+            name={{ ios: 'checkmark.shield', android: 'shield', web: 'shield' }}
+            size={16}
+            tintColor={Colors.light.textSecondary}
+          />
+          <Text className="flex-1 text-gray-400">
+            Password must be at least {MIN_PASSWORD_LENGTH} characters and include a number or
+            special character
+          </Text>
+        </View>
+
+        <View className="gap-3 pt-8">
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Go back"
-            onPress={() => goBack('/')}
-            className="-ml-2 mt-2 self-start p-2 active:opacity-60">
-            <SymbolView
-              name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }}
-              size={18}
-              tintColor={Colors.light.text}
-            />
+            accessibilityState={{ disabled: !canSubmit }}
+            disabled={!canSubmit}
+            onPress={handleSubmit}
+            className={`items-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500 py-3.5 active:opacity-85 ${
+              canSubmit ? '' : 'opacity-40'
+            }`}
+            style={canSubmit ? { boxShadow: '0 8px 20px rgba(34, 197, 94, 0.35)' } : undefined}>
+            <View className="flex-row items-center gap-2">
+              {submitting ? <ActivityIndicator size="small" color="#ffffff" /> : null}
+              <Text className="font-body-semibold text-base leading-6 text-white">
+                {submitting
+                  ? 'Creating account…'
+                  : cooldown > 0
+                    ? `Try again in ${cooldown}s`
+                    : 'Create account'}
+              </Text>
+            </View>
           </Pressable>
 
-          <View className="items-center gap-2 pt-4">
-            <Wordmark />
-            <HeartDivider />
-          </View>
-
-          <View className="gap-1 pt-6">
-            <Text className="font-heading-bold text-2xl leading-8 text-ink">
-              Create your account
-            </Text>
+          <View className="flex-row items-center justify-center gap-1">
             <Text className="font-sans text-sm leading-5 text-ink-muted">
-              Join Winly and start sharing your journey, celebrating small wins, and inspire others.
+              Already have an account?
             </Text>
+            {/* `replace`, so the two auth screens trade places instead of
+                stacking up each time you bounce between them. */}
+            <Link href="/login" replace asChild>
+              <Pressable accessibilityRole="button" className="active:opacity-60">
+                <Text className="font-body-semibold text-sm leading-5 text-ink">Log In</Text>
+              </Pressable>
+            </Link>
           </View>
-
-          <View className="gap-2.5 pt-6">
-            <Field
-              icon={{ ios: 'person', android: 'person', web: 'person' }}
-              placeholder="Name"
-              value={fullName}
-              onChangeText={edit('full_name', setFullName)}
-              invalid={Boolean(serverErrors.full_name)}
-              maxLength={255}
-              autoCapitalize="words"
-              autoComplete="name"
-              textContentType="name"
-              returnKeyType="next"
-            />
-            <Field
-              icon={{ ios: 'at', android: 'alternate_email', web: 'alternate_email' }}
-              placeholder="Username"
-              value={username}
-              onChangeText={edit('username', setUsername)}
-              invalid={usernameInvalid || Boolean(serverErrors.username)}
-              maxLength={30}
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="username"
-              textContentType="username"
-              returnKeyType="next"
-            />
-            <Field
-              icon={{ ios: 'envelope', android: 'mail', web: 'mail' }}
-              placeholder="Email address"
-              value={email}
-              onChangeText={edit('email', setEmail)}
-              invalid={emailInvalid || Boolean(serverErrors.email)}
-              maxLength={255}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="email"
-              textContentType="emailAddress"
-              returnKeyType="next"
-            />
-            <Field
-              icon={{ ios: 'lock', android: 'lock', web: 'lock' }}
-              placeholder="Password"
-              value={password}
-              onChangeText={edit('password', setPassword)}
-              invalid={passwordInvalid || Boolean(serverErrors.password)}
-              secureTextEntry
-              autoCapitalize="none"
-              autoComplete="new-password"
-              textContentType="newPassword"
-              returnKeyType="next"
-            />
-            <Field
-              icon={{ ios: 'checkmark.shield', android: 'verified_user', web: 'verified_user' }}
-              placeholder="Confirm password"
-              value={confirmPassword}
-              onChangeText={edit('password_confirmation', setConfirmPassword)}
-              invalid={mismatch || Boolean(serverErrors.password_confirmation)}
-              secureTextEntry
-              autoCapitalize="none"
-              autoComplete="new-password"
-              textContentType="newPassword"
-              returnKeyType="done"
-              onSubmitEditing={handleSubmit}
-            />
-
-            {error ? (
-              <Text className="px-4 font-sans text-xs leading-4 text-highlight">{error}</Text>
-            ) : null}
-          </View>
-          <View className="mt-2 flex-row items-start gap-2 rounded-lg bg-green-100 p-4">
-            <SymbolView
-              name={{ ios: 'checkmark.shield', android: 'shield', web: 'shield' }}
-              size={16}
-              tintColor={Colors.light.textSecondary}
-            />
-            <Text className="flex-1 text-gray-400">
-              Password must be at least {MIN_PASSWORD_LENGTH} characters and include a number or
-              special character
-            </Text>
-          </View>
-
-          <View className="gap-3 pt-8">
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: !canSubmit }}
-              disabled={!canSubmit}
-              onPress={handleSubmit}
-              className={`items-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500 py-3.5 active:opacity-85 ${
-                canSubmit ? '' : 'opacity-40'
-              }`}
-              style={canSubmit ? { boxShadow: '0 8px 20px rgba(34, 197, 94, 0.35)' } : undefined}>
-              <View className="flex-row items-center gap-2">
-                {submitting ? <ActivityIndicator size="small" color="#ffffff" /> : null}
-                <Text className="font-body-semibold text-base leading-6 text-white">
-                  {submitting
-                    ? 'Creating account…'
-                    : cooldown > 0
-                      ? `Try again in ${cooldown}s`
-                      : 'Create account'}
-                </Text>
-              </View>
-            </Pressable>
-
-            <View className="flex-row items-center justify-center gap-1">
-              <Text className="font-sans text-sm leading-5 text-ink-muted">
-                Already have an account?
-              </Text>
-              {/* `replace`, so the two auth screens trade places instead of
-                  stacking up each time you bounce between them. */}
-              <Link href="/login" replace asChild>
-                <Pressable accessibilityRole="button" className="active:opacity-60">
-                  <Text className="font-body-semibold text-sm leading-5 text-ink">Log In</Text>
-                </Pressable>
-              </Link>
-            </View>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
