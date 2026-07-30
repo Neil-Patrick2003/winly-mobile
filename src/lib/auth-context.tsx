@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -18,6 +19,7 @@ import {
   type RegisterInput,
   type User,
 } from '@/lib/auth';
+import { registerForPush, unregisterFromPush } from '@/lib/push';
 import { clearToken, loadToken, saveToken } from '@/lib/token-storage';
 
 type AuthContextValue = {
@@ -56,6 +58,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState(true);
 
+  /*
+   * The Expo push token this device is registered under, once it has one.
+   *
+   * A ref rather than state: nothing renders from it, and it is read inside
+   * `logout`, which must not be rebuilt every time registration finishes.
+   */
+  const pushToken = useRef<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -71,6 +81,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setUser(restored);
         setToken(stored);
+
+        // A restored session is a session, and the token may have been rotated
+        // or the permission revoked since the last launch — so this is asked
+        // again on every start rather than only at sign-in.
+        pushToken.current = await registerForPush(stored);
       } catch (caught) {
         // 401 means the token is dead — drop it. Anything else (the server
         // being unreachable, say) leaves it in place to retry next launch.
@@ -90,6 +105,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await saveToken(response.token, remember);
       setUser(response.user);
       setToken(response.token);
+
+      // Not awaited: registration asks for a permission, and the app should be
+      // on screen behind that prompt rather than held on a spinner behind it.
+      void registerForPush(response.token).then((registered) => {
+        pushToken.current = registered;
+      });
     },
     []
   );
@@ -118,6 +139,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
+      /*
+       * Before the token is revoked, because the endpoint scopes the delete to
+       * the caller — afterwards there is nothing left to say it with. A device
+       * left on the list is the next person to sign in on this phone getting
+       * somebody else's notifications.
+       */
+      if (token && pushToken.current) {
+        await unregisterFromPush(pushToken.current, token);
+        pushToken.current = null;
+      }
+
       if (token) await logoutRequest(token);
     } catch {
       // A failed revoke must not strand the user in a signed-in shell. The

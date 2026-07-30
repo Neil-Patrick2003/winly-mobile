@@ -13,6 +13,7 @@ import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { ConfirmProvider } from '@/lib/confirm';
 import { FeedProvider } from '@/lib/feed-context';
 import { ToastProvider } from '@/lib/toast';
+import { usePushTaps } from '@/lib/use-push-taps';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -87,6 +88,11 @@ export default function RootLayout() {
 
 function RootNavigator() {
   const { isRestoring } = useAuth();
+
+  // Inside the navigator, because it navigates: a tap has to reach a router
+  // that is already mounted. Its own guards keep it quiet until there is a
+  // session to open anything under.
+  usePushTaps();
 
   // Reading the stored token is async. Holding the tree until it resolves keeps
   // a returning user from seeing the welcome screen flash before the redirect —
