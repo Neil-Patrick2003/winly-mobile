@@ -27,7 +27,12 @@ type AuthContextValue = {
   /** True until the stored token has been read and checked on launch. */
   isRestoring: boolean;
   register: (input: RegisterInput) => Promise<void>;
-  login: (input: LoginInput) => Promise<void>;
+  /**
+   * `remember` decides how long the session outlives the app, not how strong it
+   * is. False keeps the token in memory alone: it works until the process ends,
+   * and the next launch starts at the sign-in screen.
+   */
+  login: (input: LoginInput, remember?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   /**
    * Re-read the user. Counters live on that record — `wins_count`, `streak_days`
@@ -80,18 +85,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const adopt = useCallback(async (response: { user: User; token: string }) => {
-    await saveToken(response.token);
-    setUser(response.user);
-    setToken(response.token);
-  }, []);
+  const adopt = useCallback(
+    async (response: { user: User; token: string }, remember: boolean) => {
+      await saveToken(response.token, remember);
+      setUser(response.user);
+      setToken(response.token);
+    },
+    []
+  );
 
+  // Signing up is a deliberate act on a device you have just chosen to install
+  // the app on, so it is remembered without asking.
   const register = useCallback(
-    async (input: RegisterInput) => adopt(await registerRequest(input)),
+    async (input: RegisterInput) => adopt(await registerRequest(input), true),
     [adopt]
   );
 
-  const login = useCallback(async (input: LoginInput) => adopt(await loginRequest(input)), [adopt]);
+  const login = useCallback(
+    async (input: LoginInput, remember = true) => adopt(await loginRequest(input), remember),
+    [adopt]
+  );
 
   const refreshUser = useCallback(async () => {
     if (!token) return;

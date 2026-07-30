@@ -34,6 +34,7 @@ export default function LoginScreen() {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(true);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +68,7 @@ export default function LoginScreen() {
     setError(null);
 
     try {
-      await login({ email, password });
+      await login({ email, password }, remember);
       router.replace('/(tabs)/home');
     } catch (caught) {
       if (caught instanceof ApiError) {
@@ -152,6 +153,38 @@ export default function LoginScreen() {
             returnKeyType="done"
             onSubmitEditing={handleSubmit}
           />
+
+          {/* On by default, which is what the app already did before there was
+              a choice about it. Clearing it keeps the session in memory only:
+              it lasts until the app is closed, and this device is not left
+              holding a credential afterwards. */}
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: remember }}
+            accessibilityLabel="Stay signed in on this device"
+            onPress={() => setRemember((value) => !value)}
+            hitSlop={6}
+            className="flex-row items-center gap-2.5 px-1 pt-1 active:opacity-70">
+            <View
+              className={`h-5 w-5 items-center justify-center rounded-md border-2 ${
+                remember ? '' : 'border-hairline bg-surface-card'
+              }`}
+              style={
+                remember
+                  ? { borderColor: Colors.light.primary, backgroundColor: Colors.light.primary }
+                  : undefined
+              }>
+              {remember ? (
+                <SymbolView
+                  name={{ ios: 'checkmark', android: 'check', web: 'check' }}
+                  size={11}
+                  weight="bold"
+                  tintColor="#FFFFFF"
+                />
+              ) : null}
+            </View>
+            <Text className="font-sans text-sm leading-5 text-ink">Stay signed in</Text>
+          </Pressable>
 
           {error || emailInvalid ? (
             <Text className="px-4 font-sans text-xs leading-4 text-highlight">
