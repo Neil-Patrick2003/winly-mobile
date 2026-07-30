@@ -4,16 +4,14 @@
     "slug": "winly",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/brand/apk_icon.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "winly",
     "userInterfaceStyle": "automatic",
-    "ios": {
-      "icon": "./assets/expo.icon"
-    },
+    "ios": {},
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/brand/apk_icon.png"
+        "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.neilpatrick.winly"

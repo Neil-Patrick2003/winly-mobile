@@ -109,7 +109,17 @@ function CreateButton() {
 export default function AppTabs() {
   return (
     <Tabs>
-      <TabSlot />
+      {/*
+        Bounded on purpose.
+        `TabSlot` renders through `react-native-screens`, whose container is
+        `flexGrow: 1, flexShrink: 0` — it will grow to its content and refuse to
+        shrink. On web that pushed the tab bar clean off the bottom of the
+        window and left the list inside with no height to overflow, so nothing
+        scrolled either. `flexShrink: 1` with `minHeight: 0` lets it take the
+        space that is actually left; `overflow: hidden` keeps a tall screen from
+        spilling past it.
+      */}
+      <TabSlot style={{ flex: 1, flexShrink: 1, minHeight: 0, overflow: 'hidden' }} />
       <TabList asChild>
         <TabBar>
           <TabTrigger name="home" href="/home" asChild>

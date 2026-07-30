@@ -303,16 +303,21 @@ function LearningNote({ text }: { text: string }) {
         {text}
       </Text>
 
+      {/*
+        A `Text` with `onPress`, not a `Pressable`.
+        This sits inside `PostBody`, which is itself pressable so that tapping
+        the post opens it — and a `Pressable` here would be a button nested in a
+        button, which React refuses on web. `Text` takes the press and renders
+        as a span, so the two controls can overlap without the DOM objecting.
+      */}
       {overflows ? (
-        <Pressable
+        <Text
           accessibilityRole="button"
           onPress={() => setExpanded((value) => !value)}
-          hitSlop={6}
-          className="self-start active:opacity-60">
-          <Text className="font-body-semibold text-[13px] leading-[18px] text-secondary">
-            {expanded ? 'See less' : 'See more'}
-          </Text>
-        </Pressable>
+          suppressHighlighting
+          className="mt-1 self-start font-body-semibold text-[13px] leading-[18px] text-secondary">
+          {expanded ? 'See less' : 'See more'}
+        </Text>
       ) : null}
     </>
   );

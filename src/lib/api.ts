@@ -6,7 +6,7 @@
  * physical device or an Android emulator does not. Point EXPO_PUBLIC_API_URL at
  * the machine's LAN address there.
  */
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://winly-backend.test';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://winly.on-forge.com';
 
 /** Laravel's validation-error envelope. */
 type LaravelErrorBody = {

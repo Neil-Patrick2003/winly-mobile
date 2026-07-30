@@ -1,4 +1,4 @@
-import { router, useNavigation } from 'expo-router';
+import { useNavigation } from 'expo-router';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { useCallback } from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors } from '@/constants/theme';
 import { PILLAR_ORDER, type Pillar } from '@/lib/entry-draft';
+import { goBack } from '@/lib/navigation';
 
 /**
  * The dark navy that carries the flow's forward controls — "Let's go", "Next",
@@ -81,8 +82,14 @@ export function useDismissEntryFlow() {
     const parent = navigation.getParent();
     // The parent is the root stack, and `entry` is a route on it, so one
     // goBack closes the modal no matter how deep the flow has gone.
-    if (parent) parent.goBack();
-    else router.back();
+    //
+    // Only when there is something to go back to, though. On the web the flow
+    // is reachable as a URL, and opening `/entry/...` directly leaves the root
+    // stack holding it as its only route — GO_BACK then has nothing to pop and
+    // the X does nothing at all. Sending them to the tabs is the honest
+    // equivalent of closing.
+    if (parent?.canGoBack()) parent.goBack();
+    else goBack();
   }, [navigation]);
 }
 

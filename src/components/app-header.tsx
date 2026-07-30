@@ -5,24 +5,40 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Image } from '@/components/ui/image';
 import { Colors } from '@/constants/theme';
+import { useUnreadNotifications } from '@/lib/use-unread-notifications';
 
 function HeaderAction({
   icon,
   label,
+  badge = 0,
   onPress,
 }: {
   icon: SymbolViewProps['name'];
   label: string;
+  /** How many are waiting. Zero draws nothing at all. */
+  badge?: number;
   onPress: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={badge > 0 ? `${label}, ${badge} new` : label}
       onPress={onPress}
       hitSlop={8}
       className="h-11 w-11 items-center justify-center rounded-full bg-surface-card active:opacity-60">
       <SymbolView name={icon} size={20} tintColor={Colors.light.text} />
+
+      {/* Capped, because past a point the number stops being information and
+          the badge stops fitting. */}
+      {badge > 0 ? (
+        <View
+          className="absolute -right-0.5 -top-0.5 h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-surface px-1"
+          style={{ backgroundColor: '#E5484D' }}>
+          <Text className="font-body-semibold text-[10px] leading-3 text-white">
+            {badge > 9 ? '9+' : badge}
+          </Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -34,6 +50,7 @@ function HeaderAction({
  */
 export function AppHeader() {
   const insets = useSafeAreaInsets();
+  const { unread, clear } = useUnreadNotifications();
 
   return (
     // No divider and no card fill: the header floats on the page background so
@@ -62,7 +79,14 @@ export function AppHeader() {
           <HeaderAction
             icon={{ ios: 'bell', android: 'notifications', web: 'notifications' }}
             label="Notifications"
-            onPress={() => router.push('/notifications')}
+            badge={unread}
+            onPress={() => {
+              // Cleared as the screen opens rather than after it answers: the
+              // list marks everything read on arrival, and a badge still
+              // sitting there through the transition reads as a failed tap.
+              clear();
+              router.push('/notifications');
+            }}
           />
         </View>
       </View>
