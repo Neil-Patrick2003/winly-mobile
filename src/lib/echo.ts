@@ -1,19 +1,54 @@
-import Echo from 'laravel-echo';
-import PusherClient from 'pusher-js';
+import type Echo from 'laravel-echo';
+import type PusherClient from 'pusher-js';
 
 import { API_BASE_URL } from '@/lib/api';
 
 /**
- * The Pusher class, whichever way this platform's bundle happens to export it.
+ * The two libraries, loaded on the first connection rather than at import.
  *
- * `pusher-js` ships three builds and they do not agree: the web and node ones
- * export the class itself, while the React Native one exports `{ Pusher }`.
- * Metro honours the `react-native` field, so on a device the default import is
- * an object and `new` on it throws "Object cannot be used as a constructor" —
- * which web never sees, because there it really is the class.
+ * Types only above, and `require` here, because a static import runs while the
+ * app is still starting up and cannot be caught. `pusher-js`'s React Native
+ * build pulls in `@react-native-community/netinfo`, which is a native module —
+ * so on a dev client built before it was installed, importing it throws
+ * "Cannot read property 'EventEmitter' of undefined" before the runtime is
+ * ready, taking the whole app down at launch.
+ *
+ * Realtime is an optional extra with a working fallback in polling. It has no
+ * business being able to stop the app from starting, so it is not loaded until
+ * something actually wants a socket, and failing to load is just a socket that
+ * does not happen.
+ *
+ * `pusher-js` also ships three builds that disagree about how they export: the
+ * web and node ones are the class, while the React Native one is `{ Pusher }`.
+ * Metro takes the last of those, which is why the unwrapping is needed at all.
  */
-const Pusher = ((PusherClient as unknown as { Pusher?: typeof PusherClient }).Pusher ??
-  PusherClient) as typeof PusherClient;
+function loadRealtime(): {
+  EchoCtor: new (options: object) => EchoClient;
+  PusherCtor: new (key: string, options: object) => PusherClient;
+} | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- deliberate: a static import runs at module load, where this cannot be caught.
+    const echoModule = require('laravel-echo') as Record<string, unknown>;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- deliberate: see above.
+    const pusherModule = require('pusher-js') as Record<string, unknown>;
+
+    return {
+      EchoCtor: (echoModule.default ?? echoModule) as new (options: object) => EchoClient,
+      PusherCtor: (pusherModule.Pusher ??
+        pusherModule.default ??
+        pusherModule) as new (key: string, options: object) => PusherClient,
+    };
+  } catch (caught) {
+    console.warn(
+      '[winly] Realtime is unavailable: the websocket libraries could not be loaded. ' +
+        'Notifications will arrive on the slower poll. On a device this usually means the dev ' +
+        'client predates `@react-native-community/netinfo` and needs rebuilding.',
+      caught
+    );
+
+    return null;
+  }
+}
 
 /**
  * Where the websocket server is.
@@ -75,9 +110,20 @@ export function getEcho(token: string): EchoClient | null {
 
   disconnectEcho();
 
-  echo = new Echo({
+  const loaded = loadRealtime();
+
+  if (loaded === null) {
+    // Latched, so the failed require is not retried on every render. Polling
+    // carries the notifications from here.
+    unreachable = true;
+    return null;
+  }
+
+  const { EchoCtor, PusherCtor } = loaded;
+
+  echo = new EchoCtor({
     broadcaster: 'reverb',
-    client: new Pusher(KEY, {
+    client: new PusherCtor(KEY, {
       wsHost: HOST,
       wsPort: PORT,
       wssPort: PORT,
@@ -94,8 +140,10 @@ export function getEcho(token: string): EchoClient | null {
        * a session cookie; this client has a bearer token, so it uses the
        * endpoint inside the authenticated API group instead.
        */
-      authorizer: (channel) => ({
-        authorize: (socketId, callback) => {
+      // Annotated because the options are handed to a constructor loaded at
+      // runtime, so there is no signature here for these to be inferred from.
+      authorizer: (channel: { name: string }) => ({
+        authorize: (socketId: string, callback: (error: Error | null, data: unknown) => void) => {
           fetch(`${API_BASE_URL}/api/v1/broadcasting/auth`, {
             method: 'POST',
             headers: {

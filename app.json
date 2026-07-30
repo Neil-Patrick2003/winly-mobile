@@ -14,7 +14,11 @@
         "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.neilpatrick.winly"
+      "package": "com.neilpatrick.winly",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -60,6 +64,12 @@
       "eas": {
         "projectId": "9e4b54ec-c469-4137-b87e-6c36002cd89e"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/9e4b54ec-c469-4137-b87e-6c36002cd89e"
     }
   }
 }
