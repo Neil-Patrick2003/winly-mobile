@@ -91,15 +91,29 @@ export function ImageWithPlaceholder({
     );
   }
 
-  return (
+  const image = (
     <Image
       source={typeof source === 'number' ? source : { uri: uri!, headers: mediaHeaders(uri) }}
-      className={className}
-      style={size === undefined ? undefined : { width: size, height: size }}
+      // Fills the wrapper below when there is one. `h-full w-full` is a class
+      // rather than a style for the reason the wrapper exists at all.
+      className={size === undefined ? className : `h-full w-full ${className ?? ''}`}
       contentFit={contentFit}
       accessibilityLabel={accessibilityLabel}
       onLoad={onLoad}
       onError={() => setFailed(true)}
     />
   );
+
+  if (size === undefined) return image;
+
+  /*
+   * A plain `View` carries the pixel size rather than the image itself.
+   *
+   * This `Image` is `withUniwind(ExpoImage)`, and that wrapper passes `style`
+   * through styleq, which expects compiled class names — a numeric `width`
+   * there is an error ("styleq: width typeof 62 is not \"string\" or \"null\"").
+   * React Native's own components are wired up differently and take numbers
+   * quite happily, so a plain `View` is the way to state an exact size.
+   */
+  return <View style={{ width: size, height: size }}>{image}</View>;
 }

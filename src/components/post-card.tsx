@@ -305,16 +305,26 @@ function LearningNote({ text }: { text: string }) {
       </Text>
 
       {/*
-        A `Text` with `onPress`, not a `Pressable`.
-        This sits inside `PostBody`, which is itself pressable so that tapping
-        the post opens it — and a `Pressable` here would be a button nested in a
-        button, which React refuses on web. `Text` takes the press and renders
-        as a span, so the two controls can overlap without the DOM objecting.
+        This sits inside `PostBody`, which is pressable so that tapping the post
+        opens it. Two things follow from that.
+
+        The role stays: React Native Web renders a `Text` carrying it as a real
+        `<button>`, which is what this is. What makes the nesting legal is
+        `PostBody` dropping *its* role on web — being a `Text` rather than a
+        `Pressable` never had anything to do with it.
+
+        And the press has to be stopped here. On the web it would otherwise
+        bubble to `PostBody` and open the post in the same gesture that expanded
+        the note; on native it would not, because the innermost responder takes
+        the touch and nothing propagates.
       */}
       {overflows ? (
         <Text
           accessibilityRole="button"
-          onPress={() => setExpanded((value) => !value)}
+          onPress={(event) => {
+            event.stopPropagation();
+            setExpanded((value) => !value);
+          }}
           suppressHighlighting
           className="mt-1 self-start font-body-semibold text-[13px] leading-[18px] text-secondary">
           {expanded ? 'See less' : 'See more'}
