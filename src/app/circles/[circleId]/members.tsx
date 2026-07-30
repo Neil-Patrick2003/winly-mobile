@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -28,6 +28,7 @@ import {
 } from '@/lib/circles';
 import type { UserSummary } from '@/lib/stories';
 import { timeAgo } from '@/lib/time';
+import { goBack } from '@/lib/navigation';
 
 const AVATAR = 40;
 
@@ -253,7 +254,7 @@ export default function CircleMembersScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back"
-          onPress={() => router.back()}
+          onPress={() => goBack({ pathname: '/circles/[circleId]', params: { circleId } })}
           hitSlop={8}
           className="-ml-2 p-2 active:opacity-60">
           <SymbolView

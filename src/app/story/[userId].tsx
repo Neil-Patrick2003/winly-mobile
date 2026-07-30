@@ -19,6 +19,7 @@ import {
   type StoryReel,
 } from '@/lib/stories';
 import { timeAgo } from '@/lib/time';
+import { goBack } from '@/lib/navigation';
 
 /** How long one story holds the screen before the next one takes over. */
 const DURATION_MS = 10_000;
@@ -264,7 +265,7 @@ export default function StoryViewerScreen() {
     };
   }, [token, userId, startOf]);
 
-  const close = useCallback(() => router.back(), []);
+  const close = useCallback(() => goBack(), []);
 
   /**
    * The next person in either direction who still has something to show.

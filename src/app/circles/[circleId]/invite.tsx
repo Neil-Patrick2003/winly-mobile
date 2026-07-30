@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from 'react-native';
@@ -8,6 +8,7 @@ import { ImageWithPlaceholder } from '@/components/ui/image';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
 import { fetchInvitableFriends, inviteToCircle, type InvitableFriend } from '@/lib/circles';
+import { goBack } from '@/lib/navigation';
 
 const AVATAR = 40;
 
@@ -135,7 +136,7 @@ export default function InviteToCircleScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Close"
-          onPress={() => router.back()}
+          onPress={() => goBack({ pathname: '/circles/[circleId]', params: { circleId } })}
           hitSlop={8}
           className="-ml-2 p-2 active:opacity-60">
           <SymbolView

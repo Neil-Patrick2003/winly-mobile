@@ -12,6 +12,7 @@ import { Field } from '@/components/ui/field';
 import { MediaPicker } from '@/components/ui/media-picker';
 import { TextArea } from '@/components/ui/text-area';
 import { useEntryDraft } from '@/lib/entry-draft';
+import { goBack } from '@/lib/navigation';
 
 /**
  * Step 2. One thing learned, where it came from, and anything worth keeping a
@@ -73,7 +74,7 @@ export default function LearningStepScreen() {
       </ScrollView>
 
       <StepFooter
-        onBack={() => router.back()}
+        onBack={() => goBack()}
         onNext={() => router.push('/entry/movement')}
         nextDisabled={!hasInput}
       />

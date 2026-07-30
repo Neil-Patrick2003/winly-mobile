@@ -18,6 +18,7 @@ import { Wordmark } from '@/components/wordmark';
 import { Colors } from '@/constants/theme';
 import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { goBack } from '@/lib/navigation';
 
 /**
  * Sign-in. Pinned to the light palette so arriving from the welcome screen —
@@ -99,7 +100,7 @@ export default function LoginScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Go back"
-            onPress={() => router.back()}
+            onPress={() => goBack('/')}
             className="-ml-2 mt-2 self-start p-2 active:opacity-60">
             <SymbolView
               name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }}

@@ -14,6 +14,7 @@ import { Chip } from '@/components/ui/chip';
 import { MediaPicker } from '@/components/ui/media-picker';
 import { TextArea } from '@/components/ui/text-area';
 import { OTHER_ACTIVITY, useEntryDraft } from '@/lib/entry-draft';
+import { goBack } from '@/lib/navigation';
 
 const THEME = PILLAR_THEME.movement;
 
@@ -113,7 +114,7 @@ export default function MovementStepScreen() {
       </ScrollView>
 
       <StepFooter
-        onBack={() => router.back()}
+        onBack={() => goBack()}
         onNext={() => router.push('/entry/review')}
         nextLabel="Review"
         nextDisabled={!hasInput}

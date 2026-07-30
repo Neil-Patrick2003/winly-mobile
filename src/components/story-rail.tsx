@@ -23,8 +23,10 @@ function Avatar({ uri, name, size }: { uri: string | null; name: string; size: n
       size={size}
       accessibilityLabel={`${name} profile photo`}>
       <View
-        className="items-center justify-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500"
-        style={{ width: size, height: size }}>
+        // Fills the placeholder rather than restating its size: the parent is
+        // already exactly `size` square, and repeating the numbers here is a
+        // second place to keep in step for no gain.
+        className="h-full w-full items-center justify-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500">
         <Text
           className="font-heading-bold text-white"
           style={{ fontSize: size * 0.4, lineHeight: size * 0.5 }}>

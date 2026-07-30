@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -34,6 +34,7 @@ import {
 } from '@/lib/posts';
 import { timeAgo } from '@/lib/time';
 import { useToast } from '@/lib/toast';
+import { goBack } from '@/lib/navigation';
 
 /**
  * The given name, for the title. A full display name turns the header into a
@@ -439,7 +440,7 @@ export default function CommentsScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Go back"
-          onPress={() => router.back()}
+          onPress={() => goBack()}
           hitSlop={8}
           className="-ml-2 p-2 active:opacity-60">
           <SymbolView

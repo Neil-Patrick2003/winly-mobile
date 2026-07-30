@@ -15,6 +15,7 @@ import {
   type Circle,
 } from '@/lib/circles';
 import type { Post } from '@/lib/posts';
+import { goBack } from '@/lib/navigation';
 
 /**
  * One circle: what has been shared into it.
@@ -148,7 +149,7 @@ export default function CircleScreen() {
           void (async () => {
             try {
               await deleteCircle(circle.id, token);
-              router.back();
+              goBack('/(tabs)/circles');
             } catch (caught) {
               Alert.alert(
                 'Could not delete that circle',
@@ -264,7 +265,7 @@ export default function CircleScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Back"
-            onPress={() => router.back()}
+            onPress={() => goBack('/(tabs)/circles')}
             hitSlop={10}
             className="-ml-1 active:opacity-60">
             <SymbolView

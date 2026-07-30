@@ -1,5 +1,4 @@
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import {
@@ -23,6 +22,7 @@ import { formatBytes, isWithinUploadLimit, MAX_UPLOAD_BYTES, shrinkAsset } from 
 import type { LocalFile } from '@/lib/posts';
 import { createStory } from '@/lib/stories';
 import { useToast } from '@/lib/toast';
+import { goBack } from '@/lib/navigation';
 
 /**
  * What the server takes for a story caption.
@@ -106,7 +106,7 @@ export default function NewStoryScreen() {
     try {
       await createStory(photo, caption, token);
       showToast('Story shared 🌱');
-      router.back();
+      goBack();
     } catch (caught) {
       setPosting(false);
       Alert.alert(
@@ -124,7 +124,7 @@ export default function NewStoryScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Close"
-          onPress={() => router.back()}
+          onPress={() => goBack()}
           hitSlop={8}
           className="-ml-2 p-2 active:opacity-60">
           <SymbolView

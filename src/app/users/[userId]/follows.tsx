@@ -11,6 +11,7 @@ import { useFeed } from '@/lib/feed-context';
 import { setFollowing as setFollowingRemote } from '@/lib/posts';
 import { fetchFollows, type UserSummary } from '@/lib/stories';
 import { useToast } from '@/lib/toast';
+import { goBack } from '@/lib/navigation';
 
 const AVATAR = 44;
 
@@ -239,7 +240,7 @@ export default function FollowsScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back"
-          onPress={() => router.back()}
+          onPress={() => goBack({ pathname: '/users/[userId]', params: { userId } })}
           hitSlop={8}
           className="-ml-2 p-2 active:opacity-60">
           <SymbolView

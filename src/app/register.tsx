@@ -18,6 +18,7 @@ import { Wordmark } from '@/components/wordmark';
 import { Colors } from '@/constants/theme';
 import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { goBack } from '@/lib/navigation';
 
 const MIN_PASSWORD_LENGTH = 8;
 /** 3–30 characters, lowercase letters, numbers and underscores — server rule. */
@@ -149,7 +150,7 @@ export default function RegisterScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Go back"
-            onPress={() => router.back()}
+            onPress={() => goBack('/')}
             className="-ml-2 mt-2 self-start p-2 active:opacity-60">
             <SymbolView
               name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }}

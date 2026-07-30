@@ -27,6 +27,7 @@ import {
 import { fetchUserProfile, type PublicProfile } from '@/lib/profile';
 import { timeAgo } from '@/lib/time';
 import { useToast } from '@/lib/toast';
+import { goBack } from '@/lib/navigation';
 
 const STREAK_ORANGE = '#E28F43';
 const CORAL = '#E5484D';
@@ -291,7 +292,7 @@ export default function UserProfileScreen() {
         </Text>
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.back()}
+          onPress={() => goBack()}
           className="rounded-full bg-surface-selected px-5 py-2.5 active:opacity-70">
           <Text className="font-body-semibold text-[15px] leading-5 text-ink">Go back</Text>
         </Pressable>
@@ -464,7 +465,7 @@ export default function UserProfileScreen() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Back"
-        onPress={() => router.back()}
+        onPress={() => goBack()}
         hitSlop={8}
         className="absolute left-4 h-10 w-10 items-center justify-center rounded-full bg-black/15 active:opacity-60"
         style={{ top: insets.top + 4 }}>

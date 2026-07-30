@@ -3,6 +3,7 @@ import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   Text,
   TextInput,
@@ -389,7 +390,20 @@ function PostBody({
   if (!onPress) return <>{children}</>;
 
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress}>
+    <Pressable
+      /*
+       * No button role on the web, on purpose.
+       *
+       * React Native Web turns `accessibilityRole="button"` into a real
+       * `<button>` element, and the "See more" toggle inside this body is a
+       * button too — nesting them is invalid HTML and breaks hydration. Without
+       * the role the wrapper is a plain `<div>`, so the nesting is legal and
+       * both presses keep working. Native has no such rule and keeps the role,
+       * where it is what makes the body announce itself to a screen reader.
+       */
+      accessibilityRole={Platform.OS === 'web' ? undefined : 'button'}
+      accessibilityLabel={label}
+      onPress={onPress}>
       {children}
     </Pressable>
   );

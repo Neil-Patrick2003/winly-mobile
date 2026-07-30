@@ -1,5 +1,4 @@
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import {
@@ -31,6 +30,7 @@ import {
   type ProfileUpdate,
 } from '@/lib/profile';
 import { useToast } from '@/lib/toast';
+import { goBack } from '@/lib/navigation';
 
 /**
  * One field as a row inside the section card.
@@ -173,7 +173,7 @@ export default function EditProfileScreen() {
     if (avatar !== undefined) changes.avatar = avatar;
 
     if (Object.keys(changes).length === 0) {
-      router.back();
+      goBack('/(tabs)/profile');
       return;
     }
 
@@ -186,7 +186,7 @@ export default function EditProfileScreen() {
       await refreshUser();
 
       showToast('Profile updated');
-      router.back();
+      goBack('/(tabs)/profile');
     } catch (caught) {
       setSaving(false);
 
@@ -203,7 +203,7 @@ export default function EditProfileScreen() {
   };
 
   if (!user) {
-    router.back();
+    goBack('/(tabs)/profile');
     return null;
   }
 
@@ -219,7 +219,7 @@ export default function EditProfileScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Close"
-          onPress={() => router.back()}
+          onPress={() => goBack('/(tabs)/profile')}
           hitSlop={8}
           className="-ml-2 p-2 active:opacity-60">
           <SymbolView

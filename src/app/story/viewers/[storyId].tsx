@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
@@ -9,6 +9,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
 import { fetchStoryViewers, reactionEmoji, type StoryViewer } from '@/lib/stories';
 import { timeAgo } from '@/lib/time';
+import { goBack } from '@/lib/navigation';
 
 const AVATAR = 40;
 
@@ -149,7 +150,7 @@ export default function StoryViewersScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Close"
-          onPress={() => router.back()}
+          onPress={() => goBack()}
           hitSlop={8}
           className="-ml-2 p-2 active:opacity-60">
           <SymbolView

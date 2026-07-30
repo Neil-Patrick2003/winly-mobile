@@ -20,6 +20,7 @@ import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { createCircle } from '@/lib/circles';
 import { useToast } from '@/lib/toast';
+import { goBack } from '@/lib/navigation';
 
 /** Kept in step with `StoreCircleRequest`. */
 const NAME_MAX = 60;
@@ -93,7 +94,7 @@ export default function NewCircleScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Close"
-          onPress={() => router.back()}
+          onPress={() => goBack('/(tabs)/circles')}
           hitSlop={8}
           className="-ml-2 p-2 active:opacity-60">
           <SymbolView

@@ -1,9 +1,9 @@
-import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors } from '@/constants/theme';
+import { goBack } from '@/lib/navigation';
 
 /**
  * Reached from the header. A placeholder — the settings themselves are not
@@ -19,7 +19,7 @@ export default function SettingsScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Go back"
-            onPress={() => router.back()}
+            onPress={() => goBack()}
             hitSlop={8}
             className="-ml-2 p-2 active:opacity-60">
             <SymbolView

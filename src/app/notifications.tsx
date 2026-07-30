@@ -30,6 +30,7 @@ import { ImageWithPlaceholder } from '@/components/ui/image';
 import { timeAgo } from '@/lib/time';
 import { useLiveNotifications } from '@/lib/use-live-notifications';
 import { useToast } from '@/lib/toast';
+import { goBack } from '@/lib/navigation';
 
 const AVATAR = 44;
 
@@ -286,7 +287,7 @@ export default function NotificationsScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back"
-          onPress={() => router.back()}
+          onPress={() => goBack()}
           hitSlop={8}
           className="-ml-2 p-2 active:opacity-60">
           <SymbolView

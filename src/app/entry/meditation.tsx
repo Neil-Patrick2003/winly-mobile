@@ -14,6 +14,7 @@ import {
 import { Chip } from '@/components/ui/chip';
 import { useEntryDraft } from '@/lib/entry-draft';
 import { formatClock, formatDuration, MEDITATION_DURATIONS } from '@/lib/meditation';
+import { goBack } from '@/lib/navigation';
 
 const THEME = PILLAR_THEME.meditation;
 
@@ -204,7 +205,7 @@ export default function MeditationStepScreen() {
       </ScrollView>
 
       <StepFooter
-        onBack={() => router.back()}
+        onBack={() => goBack()}
         onNext={() => router.push('/entry/learning')}
         nextDisabled={!hasInput}
       />
