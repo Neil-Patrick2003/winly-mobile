@@ -65,6 +65,13 @@ export type Post = LikeCounts & {
   shares_count: number;
   created_at: string;
   author: PostAuthor;
+  /**
+   * Whether the reader has kept this post.
+   *
+   * Theirs alone, and no indication of how many others have — a save is a
+   * private shelf rather than a reaction, so there is no count to report.
+   */
+  viewer_has_saved: boolean;
   /** Always an array — `[]` when the post has none. Ordered as WIN_ORDER. */
   wins: Win[];
   /**
@@ -478,6 +485,43 @@ export async function setLiked(postId: string, liked: boolean, token: string) {
     : await apiDelete<{ data: LikeState }>(path, token);
 
   return response.data;
+}
+
+/** What the save endpoints answer with: where the reader stands with a post. */
+export type SavedState = { post_id: string; viewer_has_saved: boolean };
+
+/**
+ * Keep a post to come back to, or take it back off the shelf.
+ *
+ * Idempotent both ways, like liking, so this states what should be true rather
+ * than asking for a change — saving something already saved answers 200, and
+ * unsaving something never saved is treated as already done.
+ *
+ * Nothing about it reaches the person who wrote the post: there is no counter
+ * and no notification, which is the whole difference between this and a like.
+ */
+export async function setSaved(postId: string, saved: boolean, token: string) {
+  const path = `/api/v1/posts/${postId}/save`;
+
+  const response = saved
+    ? await apiPut<{ data: SavedState }>(path, undefined, token)
+    : await apiDelete<{ data: SavedState }>(path, token);
+
+  return response.data;
+}
+
+/**
+ * GET /api/v1/posts/saved — the shelf, most recently saved first.
+ *
+ * Ordered by when each post was saved rather than when it was written, so the
+ * last thing put on the pile is on top however old the post itself is. Cursor
+ * paginated like every other list of posts.
+ */
+export function fetchSavedPosts(token: string, cursor?: string, perPage = PER_PAGE) {
+  const query = new URLSearchParams({ per_page: String(perPage) });
+  if (cursor) query.set('cursor', cursor);
+
+  return apiGet<Page<Post>>(`/api/v1/posts/saved?${query.toString()}`, token);
 }
 
 /**

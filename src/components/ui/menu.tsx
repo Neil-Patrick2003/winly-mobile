@@ -48,9 +48,20 @@ const DANGER = '#EF4444';
 export function MenuButton({
   items,
   accessibilityLabel = 'More options',
+  tintColor,
+  className = 'p-1 active:opacity-60',
 }: {
   items: MenuItem[];
   accessibilityLabel?: string;
+  /**
+   * The dots' colour, where the surface behind them is not the page.
+   *
+   * A circle's header is its own colour, whatever that is, and the grey a card
+   * uses disappears against it.
+   */
+  tintColor?: string;
+  /** The trigger's own styling, for the same reason. */
+  className?: string;
 }) {
   const theme = useTheme();
   const anchor = useRef<View>(null);
@@ -89,11 +100,11 @@ export function MenuButton({
         accessibilityState={{ expanded: origin !== null }}
         onPress={open}
         hitSlop={8}
-        className="p-1 active:opacity-60">
+        className={className}>
         <SymbolView
           name={{ ios: 'ellipsis', android: 'more_horiz', web: 'more_horiz' }}
           size={18}
-          tintColor={theme.textSecondary}
+          tintColor={tintColor ?? theme.textSecondary}
         />
       </Pressable>
 

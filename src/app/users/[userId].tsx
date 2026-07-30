@@ -151,7 +151,7 @@ export default function UserProfileScreen() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const { token } = useAuth();
-  const { followState, setFollowed } = useFeed();
+  const { followState, setFollowed, adoptSavedState } = useFeed();
   const showToast = useToast();
 
   const [profile, setProfile] = useState<PublicProfile | null>(null);
@@ -190,13 +190,18 @@ export default function UserProfileScreen() {
           const seen = new Set(previous.map((post) => post.id));
           return previous.concat(page.data.filter((post) => !seen.has(post.id)));
         });
+
+        // Every row says whether it is on the shelf. Told to the one place the
+        // cards read it from, or a post saved from the feed would draw an empty
+        // bookmark here.
+        adoptSavedState(page.data);
       } catch {
         failed.current = true;
       } finally {
         inFlight.current = false;
       }
     },
-    [token, userId]
+    [token, userId, adoptSavedState]
   );
 
   const load = useCallback(async () => {

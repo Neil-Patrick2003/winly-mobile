@@ -25,6 +25,7 @@ import {
   humanizeMovementType,
   setFollowing as setFollowingRemote,
   setLiked as setLikedRemote,
+  setSaved as setSavedRemote,
   COMMENT_MAX,
   type Media,
   type Post,
@@ -497,7 +498,7 @@ export function PostCard({
     followState,
     setFollowed,
     savedPostIds,
-    toggleSaved,
+    setSaved,
     applyLike,
     adjustComments,
     postState,
@@ -645,6 +646,29 @@ export function PostCard({
   };
 
   /**
+   * Put the post on the shelf, or take it off.
+   *
+   * Moved first and put back if the server disagrees, for the same reason as
+   * following: the menu has already closed, and a bookmark that waits on a
+   * round trip reads as a tap that did nothing.
+   */
+  const onSave = async () => {
+    if (!token) return;
+
+    const next = !saved;
+    setSaved(post.id, next);
+    showToast(next ? 'Post saved' : 'Removed from saved');
+
+    try {
+      const state = await setSavedRemote(post.id, next, token);
+      setSaved(post.id, state.viewer_has_saved);
+    } catch (caught) {
+      setSaved(post.id, !next);
+      showToast(caught instanceof Error ? caught.message : 'That did not go through.');
+    }
+  };
+
+  /**
    * Take the post down, once its author has said so twice.
    *
    * Removed from view before the request rather than after, because a card
@@ -688,10 +712,7 @@ export function PostCard({
     {
       label: saved ? 'Remove from saved' : 'Save post',
       icon: saved ? SAVED_ICON : SAVE_ICON,
-      onPress: () => {
-        toggleSaved(post.id);
-        showToast(saved ? 'Removed from saved' : 'Post saved');
-      },
+      onPress: () => void onSave(),
     },
     ...(isMine
       ? [

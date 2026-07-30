@@ -1,10 +1,11 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useRef, useState } from 'react';
-import { ActionSheetIOS, ActivityIndicator, Alert, FlatList, Platform, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PostCard } from '@/components/post-card';
+import { MenuButton, type MenuItem } from '@/components/ui/menu';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -12,10 +13,24 @@ import {
   fetchCircle,
   fetchCirclePosts,
   joinCircle,
+  leaveCircle,
   type Circle,
 } from '@/lib/circles';
+import { confirmDestructive } from '@/lib/confirm';
+import { useFeed } from '@/lib/feed-context';
 import type { Post } from '@/lib/posts';
 import { goBack } from '@/lib/navigation';
+import { useToast } from '@/lib/toast';
+
+/** The icons the overflow menu draws, in the post card's own vocabulary. */
+const EDIT_ICON = { ios: 'square.and.pencil', android: 'edit', web: 'edit' } as const;
+const MEMBERS_ICON = { ios: 'person.2', android: 'group', web: 'group' } as const;
+const LEAVE_ICON = {
+  ios: 'rectangle.portrait.and.arrow.right',
+  android: 'logout',
+  web: 'logout',
+} as const;
+const DELETE_ICON = { ios: 'trash', android: 'delete', web: 'delete' } as const;
 
 /**
  * One circle: what has been shared into it.
@@ -30,6 +45,8 @@ export default function CircleScreen() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const { token } = useAuth();
+  const { adoptSavedState } = useFeed();
+  const showToast = useToast();
 
   const [circle, setCircle] = useState<Circle | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -65,13 +82,18 @@ export default function CircleScreen() {
           const seen = new Set(previous.map((post) => post.id));
           return previous.concat(page.data.filter((post) => !seen.has(post.id)));
         });
+
+        // Every row says whether it is on the shelf. Told to the one place the
+        // cards read it from, or a post saved from the feed would draw an empty
+        // bookmark here.
+        adoptSavedState(page.data);
       } catch {
         failed.current = true;
       } finally {
         inFlight.current = false;
       }
     },
-    [token, circleId]
+    [token, circleId, adoptSavedState]
   );
 
   const load = useCallback(async () => {
@@ -137,64 +159,118 @@ export default function CircleScreen() {
     }
   }, [token, circle]);
 
-  const confirmDelete = useCallback(() => {
+  /**
+   * Leave, for anyone who is in it.
+   *
+   * The screen stays where it is rather than going back to the list: what is
+   * shared in a circle is worth reading whether or not you are in it, and the
+   * badge turning back into Join is the whole of what changed. The owner may
+   * leave their own — the server allows it, and a circle whose owner is obliged
+   * to stay is one nobody can step back from — and it stays theirs.
+   */
+  const leave = useCallback(async () => {
     if (!token || !circle) return;
 
-    Alert.alert('Delete this circle?', 'It disappears for every member, and cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          void (async () => {
-            try {
-              await deleteCircle(circle.id, token);
-              goBack('/(tabs)/circles');
-            } catch (caught) {
-              Alert.alert(
-                'Could not delete that circle',
-                caught instanceof Error ? caught.message : 'Please try again.'
-              );
-            }
-          })();
-        },
-      },
-    ]);
+    const confirmed = await confirmDestructive({
+      title: `Leave ${circle.name}?`,
+      message: circle.is_owner
+        ? 'It stays yours, and you can join again whenever you like.'
+        : 'You can join again whenever you like.',
+      confirmLabel: 'Leave',
+    });
+
+    if (!confirmed) return;
+
+    try {
+      const state = await leaveCircle(circle.id, token);
+      setCircle((previous) =>
+        previous
+          ? { ...previous, is_member: state.is_member, members_count: state.members_count }
+          : previous
+      );
+      showToast(`Left ${circle.name}`);
+    } catch (caught) {
+      Alert.alert(
+        'Could not leave that circle',
+        caught instanceof Error ? caught.message : 'Please try again.'
+      );
+    }
+  }, [token, circle, showToast]);
+
+  const remove = useCallback(async () => {
+    if (!token || !circle) return;
+
+    const confirmed = await confirmDestructive({
+      title: 'Delete this circle?',
+      message: 'It disappears for every member, and cannot be undone.',
+    });
+
+    if (!confirmed) return;
+
+    try {
+      await deleteCircle(circle.id, token);
+      goBack('/(tabs)/circles');
+    } catch (caught) {
+      Alert.alert(
+        'Could not delete that circle',
+        caught instanceof Error ? caught.message : 'Please try again.'
+      );
+    }
   }, [token, circle]);
 
   /**
-   * The owner's tools.
+   * What this person may do to the circle, in order of how much it costs them.
    *
-   * A native sheet on iOS and an alert elsewhere: both are the platform's own
-   * way of offering a short list of actions, and neither needs a dependency.
+   * The owner's tools first, then leaving, then taking the whole thing down.
+   * Built as a list rather than a platform sheet because the same menu has to
+   * work on the web, where `Alert` draws nothing at all — see `confirmDestructive`.
    */
-  const openMenu = useCallback(() => {
-    if (!circle) return;
-
-    const manage = () =>
-      router.push({ pathname: '/circles/[circleId]/members', params: { circleId: circle.id } });
-
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ['Cancel', 'Manage members', 'Delete circle'],
-          destructiveButtonIndex: 2,
-          cancelButtonIndex: 0,
-        },
-        (index) => {
-          if (index === 1) manage();
-          if (index === 2) confirmDelete();
-        }
-      );
-      return;
-    }
-
-    Alert.alert(circle.name, undefined, [
-      { text: 'Manage members', onPress: manage },
-      { text: 'Delete circle', style: 'destructive', onPress: confirmDelete },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  }, [circle, confirmDelete]);
+  const menu: MenuItem[] = circle
+    ? [
+        ...(circle.is_owner
+          ? [
+              {
+                label: 'Edit circle',
+                icon: EDIT_ICON,
+                onPress: () =>
+                  router.push({
+                    pathname: '/circles/[circleId]/edit' as const,
+                    params: { circleId: circle.id },
+                  }),
+              },
+              {
+                label: 'Manage members',
+                icon: MEMBERS_ICON,
+                onPress: () =>
+                  router.push({
+                    pathname: '/circles/[circleId]/members' as const,
+                    params: { circleId: circle.id },
+                  }),
+              },
+            ]
+          : []),
+        ...(circle.is_member
+          ? [
+              {
+                label: 'Leave circle',
+                icon: LEAVE_ICON,
+                destructive: true,
+                onPress: () => void leave(),
+              },
+            ]
+          : []),
+        ...(circle.is_owner
+          ? [
+              {
+                label: 'Delete circle',
+                icon: DELETE_ICON,
+                destructive: true,
+                onPress: () => void remove(),
+              },
+            ]
+          : []),
+      ]
+    : [];
 
   const members = circle?.members_count ?? 0;
   const shared = circle?.posts_count;
@@ -442,21 +518,16 @@ export default function CircleScreen() {
           </Pressable>
         ) : null}
 
-        {/* Managing and deleting are the owner's alone, and the server agrees —
-            so the menu is not offered where everything in it would earn a 403. */}
-        {circle?.is_owner ? (
-          <Pressable
-            accessibilityRole="button"
+        {/* Not offered to somebody looking in from outside, who has nothing to
+            edit, nothing to manage and nothing to leave — the join button above
+            is the whole of what they can do here. */}
+        {menu.length > 0 ? (
+          <MenuButton
+            items={menu}
             accessibilityLabel="Circle options"
-            onPress={openMenu}
-            hitSlop={8}
-            className="h-10 w-10 items-center justify-center rounded-full bg-black/15 active:opacity-60">
-            <SymbolView
-              name={{ ios: 'ellipsis', android: 'more_horiz', web: 'more_horiz' }}
-              size={18}
-              tintColor="#FFFFFF"
-            />
-          </Pressable>
+            tintColor="#FFFFFF"
+            className="h-10 w-10 items-center justify-center rounded-full bg-black/15 active:opacity-60"
+          />
         ) : null}
       </View>
     </View>

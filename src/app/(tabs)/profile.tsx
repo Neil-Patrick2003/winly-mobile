@@ -17,6 +17,7 @@ import { Wordmark } from '@/components/wordmark';
 import { BottomTabInset, Colors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
+import { useFeed } from '@/lib/feed-context';
 import { fetchUserPosts, humanizeMovementType, type Post, type Win } from '@/lib/posts';
 import { timeAgo } from '@/lib/time';
 
@@ -150,6 +151,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const { user, token, logout, isRestoring, refreshUser } = useAuth();
+  const { adoptSavedState } = useFeed();
   const [loggingOut, setLoggingOut] = useState(false);
 
   const [posts, setPosts] = useState<Post[]>([]);
@@ -186,13 +188,18 @@ export default function ProfileScreen() {
           const seen = new Set(previous.map((post) => post.id));
           return previous.concat(page.data.filter((post) => !seen.has(post.id)));
         });
+
+        // Every row says whether it is on the shelf. Told to the one place the
+        // cards read it from, or a post saved from the feed would draw an empty
+        // bookmark here.
+        adoptSavedState(page.data);
       } catch {
         failed.current = true;
       } finally {
         inFlight.current = false;
       }
     },
-    [token, userId]
+    [token, userId, adoptSavedState]
   );
 
   const reload = useCallback(async () => {
@@ -390,6 +397,34 @@ export default function ProfileScreen() {
             <Text className="font-body-semibold text-[14px] leading-5 text-white">Log a win</Text>
           </Pressable>
         </View>
+
+        {/* The shelf. On your own profile only, which is the whole of where it
+            belongs: what you have kept is nobody else's business, so there is
+            no matching row on anyone else's. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Saved posts"
+          onPress={() => router.push('/saved')}
+          className="mx-4 mt-3 flex-row items-center gap-3 rounded-3xl bg-surface-card px-4 py-3.5 active:opacity-70">
+          <View className="h-11 w-11 items-center justify-center rounded-2xl bg-surface-selected">
+            <SymbolView
+              name={{ ios: 'bookmark', android: 'bookmark_border', web: 'bookmark_border' }}
+              size={20}
+              tintColor={Colors.light.textSecondary}
+            />
+          </View>
+          <View className="flex-1">
+            <Text className="font-body-semibold text-[15px] leading-5 text-ink">Saved</Text>
+            <Text numberOfLines={1} className="mt-0.5 font-sans text-[13px] leading-[18px] text-ink-muted">
+              Wins you kept to come back to
+            </Text>
+          </View>
+          <SymbolView
+            name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }}
+            size={14}
+            tintColor={Colors.light.textSecondary}
+          />
+        </Pressable>
 
         {/* Only for admins, and only because the server says so — `is_admin`
             comes off the user record rather than being guessed at here. */}

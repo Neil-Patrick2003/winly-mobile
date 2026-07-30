@@ -20,6 +20,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
 import { joinCircle, type Circle } from '@/lib/circles';
 import { fetchDiscover, type Discover, type SuggestedPerson } from '@/lib/discover';
+import { useFeed } from '@/lib/feed-context';
 import { setFollowing as setFollowingRemote } from '@/lib/posts';
 import { useToast } from '@/lib/toast';
 
@@ -136,6 +137,7 @@ function PersonRow({
 }) {
   const theme = useTheme();
   const { token } = useAuth();
+  const { setFollowed } = useFeed();
   const showToast = useToast();
   const [busy, setBusy] = useState(false);
 
@@ -144,7 +146,17 @@ function PersonRow({
 
     setBusy(true);
     try {
-      await setFollowingRemote(person.id, true, token);
+      const state = await setFollowingRemote(person.id, true, token);
+      /*
+       * Said out loud, and not only to the server.
+       *
+       * A suggestion here is somebody the feed may already be showing a card
+       * for, and a card the reader scrolled past put a `false` against them.
+       * Following without recording it left that `false` standing as the last
+       * word this session had, so the person turned up on your own Following
+       * list still offering a Follow button.
+       */
+      setFollowed(person.id, state.is_following);
       onFollowed(person.id);
       showToast(`Following ${person.username ?? person.full_name}`);
     } catch (caught) {

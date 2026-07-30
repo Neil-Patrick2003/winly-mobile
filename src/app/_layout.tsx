@@ -95,6 +95,9 @@ function RootNavigator() {
       <Stack.Screen name="register" options={SWAP} />
       <Stack.Screen name="login" options={SWAP} />
       <Stack.Screen name="settings" />
+      {/* Reached from your own profile, and pushed rather than presented: it is
+          a place you go and come back from, not a task you finish. */}
+      <Stack.Screen name="saved" />
       <Stack.Screen name="messages" />
       {/* Left the tab bar when Circles took the slot, and pushed from the bell
           in the header instead. */}
@@ -112,6 +115,9 @@ function RootNavigator() {
       <Stack.Screen name="circles/[circleId]" />
       <Stack.Screen name="circles/[circleId]/members" />
       <Stack.Screen name="circles/[circleId]/invite" options={{ presentation: 'modal' }} />
+      {/* Changing one is the same task as starting one, and is presented the
+          same way. */}
+      <Stack.Screen name="circles/[circleId]/edit" options={{ presentation: 'modal' }} />
       <Stack.Screen name="circles/new" options={{ presentation: 'modal' }} />
       {/* Pushed from a feed card's comment count, so it reads as going one
           level into that post rather than as a separate place. */}

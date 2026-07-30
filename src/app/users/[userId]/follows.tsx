@@ -141,6 +141,7 @@ export default function FollowsScreen() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const { token } = useAuth();
+  const { adoptFollowState } = useFeed();
 
   const [relation, setRelation] = useState<Relation>(tab === 'following' ? 'following' : 'followers');
   const [people, setPeople] = useState<Record<Relation, UserSummary[]>>({
@@ -185,6 +186,19 @@ export default function FollowsScreen() {
         failed.current = false;
         setError(null);
 
+        /*
+         * Every row here is the server answering, for this reader, the exact
+         * question the button asks — so a first load is the moment to believe
+         * it over anything this session is still holding. Without this, a
+         * `false` left behind by a feed card the reader has since followed
+         * elsewhere outlives the follow and keeps the button on Follow for
+         * somebody plainly standing on the Following list.
+         *
+         * A further page is not adopted: by then the reader can have tapped a
+         * row, and a request that set out before the tap must not answer it.
+         */
+        if (reset) adoptFollowState(page.data);
+
         setPeople((previous) => {
           if (reset) return { ...previous, [which]: page.data };
 
@@ -203,7 +217,7 @@ export default function FollowsScreen() {
         inFlight.current = false;
       }
     },
-    [token, userId]
+    [token, userId, adoptFollowState]
   );
 
   // Each tab is fetched the first time it is looked at, and not again — the

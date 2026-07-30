@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPost } from '@/lib/api';
+import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import type { Page, Post } from '@/lib/posts';
 import type { UserSummary } from '@/lib/stories';
 
@@ -79,6 +79,35 @@ export async function createCircle(
   if (tag) body.tag = tag;
 
   const response = await apiPost<{ data: Circle }>('/api/v1/circles', body, token);
+
+  return response.data;
+}
+
+/**
+ * PATCH /api/v1/circles/{id} — rename it, or say again what it is for.
+ *
+ * The owner's alone; anyone else gets a 403. Only what is sent changes, so a
+ * cleared box has to arrive as an explicit `null` — leaving the field out means
+ * "as it was", which is what lets a form send the name on its own.
+ *
+ * The badge letter follows a rename server-side. The colour does not: it is how
+ * the circle is picked out of a list, and it stays the one people know.
+ */
+export async function updateCircle(
+  circleId: string,
+  fields: { name: string; description?: string | null; tag?: string | null },
+  token: string
+) {
+  const body: Record<string, string | null> = { name: fields.name.trim() };
+
+  if (fields.description !== undefined) body.description = fields.description?.trim() || null;
+  if (fields.tag !== undefined) body.tag = fields.tag?.trim() || null;
+
+  const response = await apiPatch<{ data: Circle }>(
+    `/api/v1/circles/${circleId}`,
+    body,
+    token
+  );
 
   return response.data;
 }

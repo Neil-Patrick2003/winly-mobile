@@ -212,7 +212,7 @@ export default function CommentsScreen() {
   const theme = useTheme();
   const muted = useResolveClassNames('text-ink-muted').color;
   const { user, token } = useAuth();
-  const { posts, adjustComments } = useFeed();
+  const { posts, adjustComments, adoptSavedState } = useFeed();
   const showToast = useToast();
 
   const [comments, setComments] = useState<Comment[]>([]);
@@ -320,7 +320,12 @@ export default function CommentsScreen() {
     (async () => {
       try {
         const fetched = await fetchPost(postId, token);
-        if (!cancelled) setFetchedPost(fetched);
+        if (cancelled) return;
+
+        setFetchedPost(fetched);
+        // It says whether it is on the shelf; the card above the thread reads
+        // that from the shared set rather than from the row.
+        adoptSavedState([fetched]);
       } catch {
         // Leaves the screen as a bare thread.
       }
@@ -328,7 +333,7 @@ export default function CommentsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [token, postId, missingFromFeed]);
+  }, [token, postId, missingFromFeed, adoptSavedState]);
 
   const refresh = async () => {
     atEnd.current = false;

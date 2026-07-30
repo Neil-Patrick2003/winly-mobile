@@ -75,14 +75,42 @@ type FeedValue = {
   followState: ReadonlyMap<string, boolean>;
   setFollowed: (userId: string, following: boolean) => void;
   /**
+   * Take what the server has just said about a freshly fetched page of people.
+   *
+   * `setFollowed` records a decision taken here; this records the one the
+   * server reports, and is how a map that has drifted is put right — a follow
+   * taken on another device, or through a screen that did not say so, would
+   * otherwise be outvoted forever by whatever this session last believed.
+   *
+   * Rows arriving without `is_following` say nothing about it and are left
+   * exactly as they were, for the same reason the feed leaves them: absent is
+   * not false. Only for a page just loaded, never a stale one — this overwrites
+   * what the reader chose.
+   */
+  adoptFollowState: (people: readonly { id: string; is_following?: boolean }[]) => void;
+  /**
    * Posts the viewer has saved.
    *
-   * Session-only, and deliberately so: the API has no bookmark endpoint, so
-   * there is nowhere to put this. It survives scrolling — which per-card state
-   * would not, since the list recycles rows — and nothing more.
+   * The server's answer, held here rather than read off each row, because the
+   * same post is drawn from several lists — the feed, a circle's wall, the
+   * shelf itself — and saving it in one has to fill in the bookmark in all of
+   * them. Seeded by `adoptSavedState` from whatever a page reports, and moved
+   * by `setSaved`.
+   *
+   * A set is enough where the follow state needs a map: every endpoint that
+   * serves a post says `viewer_has_saved`, so absent means unsaved rather than
+   * unknown.
    */
   savedPostIds: ReadonlySet<string>;
-  toggleSaved: (postId: string) => void;
+  /**
+   * Record a save the reader has just made, before the server has answered.
+   *
+   * The request itself belongs to whoever called: the card knows how to put its
+   * own bookmark back and say why, and this holds no toast of its own.
+   */
+  setSaved: (postId: string, saved: boolean) => void;
+  /** Take the save state a freshly fetched page of posts reports. */
+  adoptSavedState: (posts: readonly Post[]) => void;
   /**
    * Write a post's like state back into the row.
    *
@@ -204,6 +232,35 @@ export function FeedProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  /**
+   * Take what a freshly fetched page says about its posts.
+   *
+   * Never a rebuild, always a merge: a page is one list's worth of posts, not
+   * the whole shelf, so clearing what it does not mention would unsave
+   * everything the reader saved from somewhere else.
+   *
+   * Declared above `load`, which lists it as a dependency — a `const` named in
+   * a dependency array is read while rendering, so one declared further down
+   * the file would be read before it exists.
+   */
+  const adoptSavedState = useCallback((posts: readonly Post[]) => {
+    setSavedPostIds((previous) => {
+      // Built only once something actually moves, so a page that agrees with
+      // what is held does not re-render every card drawing from this.
+      let next: Set<string> | null = null;
+
+      for (const post of posts) {
+        if (previous.has(post.id) === post.viewer_has_saved) continue;
+
+        next ??= new Set(previous);
+        if (post.viewer_has_saved) next.add(post.id);
+        else next.delete(post.id);
+      }
+
+      return next ?? previous;
+    });
+  }, []);
+
   const load = useCallback(
     async (reset: boolean) => {
       if (!token || inFlight.current) return;
@@ -224,6 +281,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
         const rows = page.data.map(withLikeState);
         setPosts((previous) => (reset ? rows : [...previous, ...rows]));
         applyFollowState(page.data, reset);
+        adoptSavedState(page.data);
       } catch (caught) {
         failed.current = true;
         setError(caught instanceof Error ? caught.message : 'Could not load the feed.');
@@ -231,7 +289,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
         inFlight.current = false;
       }
     },
-    [token, applyFollowState]
+    [token, applyFollowState, adoptSavedState]
   );
 
   useEffect(() => {
@@ -274,10 +332,35 @@ export function FeedProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const toggleSaved = useCallback((postId: string) => {
+  const adoptFollowState = useCallback(
+    (people: readonly { id: string; is_following?: boolean }[]) => {
+      setFollowState((previous) => {
+        // Built only once something actually moves: a page that agrees with
+        // what is already held must not hand back a new map, or every list that
+        // pages in re-renders each card in the feed behind it.
+        let next: Map<string, boolean> | null = null;
+
+        for (const person of people) {
+          if (person.is_following === undefined) continue;
+          if (previous.get(person.id) === person.is_following) continue;
+
+          next ??= new Map(previous);
+          next.set(person.id, person.is_following);
+        }
+
+        return next ?? previous;
+      });
+    },
+    []
+  );
+
+  const setSaved = useCallback((postId: string, saved: boolean) => {
     setSavedPostIds((previous) => {
+      if (previous.has(postId) === saved) return previous;
+
       const next = new Set(previous);
-      if (!next.delete(postId)) next.add(postId);
+      if (saved) next.add(postId);
+      else next.delete(postId);
       return next;
     });
   }, []);
@@ -405,8 +488,10 @@ export function FeedProvider({ children }: { children: ReactNode }) {
       replacePost,
       followState,
       setFollowed,
+      adoptFollowState,
       savedPostIds,
-      toggleSaved,
+      setSaved,
+      adoptSavedState,
       applyLike,
       adjustComments,
       postState,
@@ -430,8 +515,10 @@ export function FeedProvider({ children }: { children: ReactNode }) {
       replacePost,
       followState,
       setFollowed,
+      adoptFollowState,
       savedPostIds,
-      toggleSaved,
+      setSaved,
+      adoptSavedState,
       applyLike,
       adjustComments,
       postState,
