@@ -19,7 +19,9 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
 import { useFeed } from '@/lib/feed-context';
 import { fetchUserPosts, humanizeMovementType, type Post, type Win } from '@/lib/posts';
+import { standingToday } from '@/lib/progress';
 import { timeAgo } from '@/lib/time';
+import { useWeekProgress } from '@/lib/use-week-progress';
 
 /** The coral the destructive action is drawn in. */
 const CORAL = '#E5484D';
@@ -152,6 +154,10 @@ export default function ProfileScreen() {
   const theme = useTheme();
   const { user, token, logout, isRestoring, refreshUser } = useAuth();
   const { adoptSavedState } = useFeed();
+  // Reloads on focus, which is what keeps the streak card honest after sharing:
+  // the flow is pushed over this screen, so it is never unmounted and coming
+  // back is the only moment the answer has changed.
+  const { week } = useWeekProgress();
   const [loggingOut, setLoggingOut] = useState(false);
 
   const [posts, setPosts] = useState<Post[]>([]);
@@ -268,6 +274,7 @@ export default function ProfileScreen() {
 
   const initial = (user.full_name.trim()[0] ?? user.username[0] ?? '?').toUpperCase();
   const streak = user.streak_days;
+  const standing = standingToday(week);
 
   return (
     <View className="flex-1 bg-surface">
@@ -381,20 +388,43 @@ export default function ProfileScreen() {
             <Text className="font-heading-bold text-base leading-6" style={{ color: STREAK_ORANGE }}>
               {streak === 1 ? '1-day streak' : `${streak}-day streak`}
             </Text>
-            <Text numberOfLines={1} className="mt-0.5 font-sans text-[13px] leading-[18px] text-ink-muted">
-              Longest: {user.longest_streak === 1 ? '1 day' : `${user.longest_streak} days`}
-              {/* Encouragement only where there is something to keep going. */}
-              {streak > 0 ? ' · Keep it going!' : ' · Start one today'}
+            {/* Today's standing takes the line where there is any, because what
+                is left to do today is more use than a record set months ago.
+                The longest run is what shows on a day not yet started, and on
+                one nothing is known about. */}
+            <Text
+              numberOfLines={2}
+              className="mt-0.5 font-sans text-[13px] leading-[18px] text-ink-muted">
+              {standing.prompt ?? (
+                <>
+                  Longest: {user.longest_streak === 1 ? '1 day' : `${user.longest_streak} days`}
+                  {/* Encouragement only where there is something to keep going. */}
+                  {streak > 0 ? ' · Keep it going!' : ' · Start one today'}
+                </>
+              )}
             </Text>
           </View>
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Log a win"
+            accessibilityLabel={
+              standing.complete
+                ? 'All three logged today. Log another win'
+                : standing.action
+            }
+            // Still opens the flow when the day is complete: three is what the
+            // rings count, not a quota, and somebody with a fourth thing to
+            // share should not be turned away by their own good day.
             onPress={() => router.push('/entry')}
             className="rounded-full px-4 py-2.5 active:opacity-85"
-            style={{ backgroundColor: STREAK_ORANGE }}>
-            <Text className="font-body-semibold text-[14px] leading-5 text-white">Log a win</Text>
+            // Settled rather than urgent once the day is done — it stays a
+            // button, but stops asking to be pressed.
+            style={{ backgroundColor: standing.complete ? '#E9D9BE' : STREAK_ORANGE }}>
+            <Text
+              className="font-body-semibold text-[14px] leading-5"
+              style={{ color: standing.complete ? STREAK_ORANGE : '#FFFFFF' }}>
+              {standing.action}
+            </Text>
           </Pressable>
         </View>
 
