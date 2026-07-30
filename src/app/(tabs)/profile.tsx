@@ -405,20 +405,18 @@ export default function ProfileScreen() {
             </Text>
           </View>
 
+          {/* Spent once all three are in, rather than merely restyled: a button
+              that still takes the press says the day is not finished, which is
+              the opposite of what the label beside it has just said. */}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={
-              standing.complete
-                ? 'All three logged today. Log another win'
-                : standing.action
+              standing.complete ? 'All three logged today' : standing.action
             }
-            // Still opens the flow when the day is complete: three is what the
-            // rings count, not a quota, and somebody with a fourth thing to
-            // share should not be turned away by their own good day.
+            accessibilityState={{ disabled: standing.complete }}
+            disabled={standing.complete}
             onPress={() => router.push('/entry')}
-            className="rounded-full px-4 py-2.5 active:opacity-85"
-            // Settled rather than urgent once the day is done — it stays a
-            // button, but stops asking to be pressed.
+            className={`rounded-full px-4 py-2.5 ${standing.complete ? '' : 'active:opacity-85'}`}
             style={{ backgroundColor: standing.complete ? '#E9D9BE' : STREAK_ORANGE }}>
             <Text
               className="font-body-semibold text-[14px] leading-5"
