@@ -28,10 +28,46 @@ export default function Root({ children }: PropsWithChildren) {
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         {/* `viewport-fit=cover` so the safe-area insets the screens already
-            read resolve to real numbers on a notched phone browser. */}
+            read resolve to real numbers on a notched phone browser.
+
+            `maximum-scale=1, user-scalable=no` pins the zoom. The one that
+            actually matters day to day is not pinching but focus: Mobile Safari
+            zooms the page in whenever a text field smaller than 16px takes
+            focus, and every input in this app is 15px — so signing in or writing
+            a comment left the page scaled up and scrolled sideways, with no way
+            back but pinching out. Capping the scale is what stops that. */}
         <meta
           name="viewport"
-          content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
+          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, shrink-to-fit=no, viewport-fit=cover"
+        />
+
+        {/*
+          The rest of the zoom, which the viewport tag alone does not cover.
+
+          `touch-action: manipulation` drops the double-tap-to-zoom gesture, and
+          with it the ~300ms the browser waits after every tap to find out
+          whether a second one is coming — so this makes the app feel quicker as
+          much as it fixes the zoom.
+
+          Mobile Safari has ignored `user-scalable=no` since iOS 10, on purpose,
+          so pinch is refused explicitly through its own `gesture*` events. Those
+          are WebKit-only and inert everywhere else.
+        */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
+            `,
+          }}
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              for (const event of ['gesturestart', 'gesturechange', 'gestureend']) {
+                document.addEventListener(event, function (e) { e.preventDefault(); }, { passive: false });
+              }
+            `,
+          }}
         />
 
         {/*

@@ -17,7 +17,7 @@ import { MenuButton, type MenuItem } from '@/components/ui/menu';
 import { Colors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
-import { confirmDestructive } from '@/lib/confirm';
+import { useConfirm } from '@/lib/confirm';
 import { useFeed } from '@/lib/feed-context';
 import {
   createComment,
@@ -521,6 +521,7 @@ export function PostCard({
   const post = postEdits[incoming.id] ?? incoming;
   const { author, wins } = post;
   const showToast = useToast();
+  const confirm = useConfirm();
   const theme = useTheme();
 
   /*
@@ -629,6 +630,19 @@ export function PostCard({
     if (!token) return;
 
     const next = !following;
+
+    // Asked on the way out only: following is cheap to undo, and this sits in a
+    // menu where the row above it is Save — an easy mis-tap.
+    if (!next) {
+      const confirmed = await confirm({
+        title: `Unfollow ${displayName}?`,
+        message: 'Their wins will stop appearing in your feed.',
+        confirmLabel: 'Unfollow',
+        destructive: true,
+      });
+      if (!confirmed) return;
+    }
+
     // Moved first, then put back if the server disagrees: the menu has already
     // closed, and waiting on a round trip to acknowledge a tap reads as a
     // dropped press.
@@ -678,9 +692,11 @@ export function PostCard({
   const onDelete = async () => {
     if (!token) return;
 
-    const confirmed = await confirmDestructive({
+    const confirmed = await confirm({
       title: 'Delete this post?',
       message: 'The wins on it, and any photos, go with it. This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
     });
 
     if (!confirmed) return;

@@ -16,7 +16,7 @@ import {
   leaveCircle,
   type Circle,
 } from '@/lib/circles';
-import { confirmDestructive } from '@/lib/confirm';
+import { useConfirm } from '@/lib/confirm';
 import { useFeed } from '@/lib/feed-context';
 import type { Post } from '@/lib/posts';
 import { goBack } from '@/lib/navigation';
@@ -47,6 +47,7 @@ export default function CircleScreen() {
   const { token } = useAuth();
   const { adoptSavedState } = useFeed();
   const showToast = useToast();
+  const confirm = useConfirm();
 
   const [circle, setCircle] = useState<Circle | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -171,12 +172,13 @@ export default function CircleScreen() {
   const leave = useCallback(async () => {
     if (!token || !circle) return;
 
-    const confirmed = await confirmDestructive({
+    const confirmed = await confirm({
       title: `Leave ${circle.name}?`,
       message: circle.is_owner
         ? 'It stays yours, and you can join again whenever you like.'
         : 'You can join again whenever you like.',
       confirmLabel: 'Leave',
+      destructive: true,
     });
 
     if (!confirmed) return;
@@ -195,14 +197,16 @@ export default function CircleScreen() {
         caught instanceof Error ? caught.message : 'Please try again.'
       );
     }
-  }, [token, circle, showToast]);
+  }, [confirm, token, circle, showToast]);
 
   const remove = useCallback(async () => {
     if (!token || !circle) return;
 
-    const confirmed = await confirmDestructive({
+    const confirmed = await confirm({
       title: 'Delete this circle?',
       message: 'It disappears for every member, and cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
     });
 
     if (!confirmed) return;
@@ -216,7 +220,7 @@ export default function CircleScreen() {
         caught instanceof Error ? caught.message : 'Please try again.'
       );
     }
-  }, [token, circle]);
+  }, [confirm, token, circle]);
 
   /**
    * What this person may do to the circle, in order of how much it costs them.

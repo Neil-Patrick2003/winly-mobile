@@ -17,6 +17,7 @@ import { ImageWithPlaceholder } from '@/components/ui/image';
 import { Colors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
+import { useConfirm } from '@/lib/confirm';
 import { useFeed } from '@/lib/feed-context';
 import {
   fetchUserPosts,
@@ -154,6 +155,7 @@ export default function UserProfileScreen() {
   const { token } = useAuth();
   const { followState, setFollowed, adoptSavedState } = useFeed();
   const showToast = useToast();
+  const confirm = useConfirm();
 
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -262,6 +264,18 @@ export default function UserProfileScreen() {
     if (!token || !profile || following) return;
 
     const next = !isFollowing;
+
+    // Asked on the way out only — see the same guard on the follows list.
+    if (!next) {
+      const confirmed = await confirm({
+        title: `Unfollow ${profile.full_name}?`,
+        message: 'Their wins will stop appearing in your feed.',
+        confirmLabel: 'Unfollow',
+        destructive: true,
+      });
+      if (!confirmed) return;
+    }
+
     setBusy(true);
     setFollowed(profile.id, next);
     try {
@@ -283,7 +297,7 @@ export default function UserProfileScreen() {
     } finally {
       setBusy(false);
     }
-  }, [token, profile, following, isFollowing, setFollowed, showToast]);
+  }, [confirm, token, profile, following, isFollowing, setFollowed, showToast]);
 
   if (loading) {
     return (

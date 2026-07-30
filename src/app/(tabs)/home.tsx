@@ -18,12 +18,24 @@ import { SegmentedRing } from '@/components/ui/segmented-ring';
 import { BottomTabInset, Colors } from '@/constants/theme';
 import { useAuth } from '@/lib/auth-context';
 import { useFeed } from '@/lib/feed-context';
+import { FEED_KINDS, type FeedKind } from '@/lib/posts';
 import { WIN_KINDS, type WeekProgress } from '@/lib/progress';
 import { useWeekProgress } from '@/lib/use-week-progress';
 
 /** The green the home screen leans on: headings, buttons, the active tab. */
 const GREEN = '#5FBC88';
 const STREAK_ORANGE = '#E28F43';
+
+/**
+ * What an empty feed means, which is not the same on each tab: nobody has
+ * posted, nobody you follow has posted, or none of your circles has anything on
+ * its wall. Each points at the thing that would actually fill it.
+ */
+const EMPTY_HINT: Record<FeedKind, string> = {
+  all: 'Follow a few people, or share the first win yourself.',
+  following: 'Nobody you follow has shared a win yet. Discover has people worth following.',
+  circles: 'Nothing has been shared into your circles yet. Be the first.',
+};
 
 /**
  * Time-of-day greeting, on the device's local clock.
@@ -164,7 +176,8 @@ function WeeklyProgress({
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { posts, error, loading, loadingMore, refreshing, hasMore, refresh, loadMore } = useFeed();
+  const { posts, error, loading, loadingMore, refreshing, hasMore, refresh, loadMore, kind, setKind } =
+    useFeed();
   const {
     week,
     loading: weekLoading,
@@ -272,15 +285,40 @@ export default function HomeScreen() {
 
       <WeeklyProgress week={week} loading={weekLoading} error={weekError} />
 
-      {/* The head of the feed's card, and now the whole of it: rounded at the
-          top only, since the list continues it and the footer closes it off.
+      {/* The head of the feed's card: the filter sits on top of the posts
+          rather than floating above them, so the whole newsfeed reads as one
+          surface. Rounded at the top only — the list continues it, and the
+          footer closes it off.
 
-          It is all that is left of the For You / Following / Circles filter,
-          which sat here until the tabs came out. They were presentational —
-          the feed endpoint takes `per_page` and `cursor` and nothing else, so
-          all three showed the same posts — but the card still needs its top
-          edge, and the posts below would otherwise begin on a square one. */}
-      <View className="mx-4 mt-4 h-5 rounded-t-3xl bg-surface-card" />
+          Each tab is a real query now: For You is everything, Following is the
+          people you chose, and Circles is what has been shared into circles you
+          are in. One post can be in all three, which is expected — they are
+          three ways of arriving at the feed, not three audiences. */}
+      <View className="mx-4 mt-4 flex-row gap-5 rounded-t-3xl bg-surface-card px-4">
+        {FEED_KINDS.map((item) => {
+          const active = item.key === kind;
+          return (
+            <Pressable
+              key={item.key}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              onPress={() => setKind(item.key)}
+              className="py-4 active:opacity-70">
+              <Text
+                className={`text-base leading-6 ${
+                  active ? 'font-body-semibold' : 'font-sans text-ink-muted'
+                }`}
+                style={active ? { color: GREEN } : undefined}>
+                {item.label}
+              </Text>
+              <View
+                className="absolute inset-x-0 bottom-0 h-[3px] rounded-t-full"
+                style={{ backgroundColor: active ? GREEN : 'transparent' }}
+              />
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 
@@ -328,8 +366,11 @@ export default function HomeScreen() {
               <Text className="text-center font-body-semibold text-base leading-6 text-ink">
                 {error ? 'Could not load the feed' : 'Nothing here yet'}
               </Text>
+              {/* Empty means a different thing on each tab now, and the
+                  generic line sent people to follow somebody they may already
+                  follow plenty of. */}
               <Text className="text-center font-sans text-sm leading-5 text-ink-muted">
-                {error ?? 'Follow a few people, or share the first win yourself.'}
+                {error ?? EMPTY_HINT[kind]}
               </Text>
               {error ? (
                 <Pressable

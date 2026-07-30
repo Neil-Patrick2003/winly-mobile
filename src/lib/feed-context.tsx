@@ -10,7 +10,13 @@ import {
 } from 'react';
 
 import { useAuth } from '@/lib/auth-context';
-import { fetchFeed, withLikeState, type LikeCounts, type Post } from '@/lib/posts';
+import {
+  fetchFeed,
+  withLikeState,
+  type FeedKind,
+  type LikeCounts,
+  type Post,
+} from '@/lib/posts';
 
 /**
  * The cursor-paginated feed.
@@ -72,6 +78,9 @@ type FeedValue = {
    * the id instead left the payload's stale `is_following: true` to win, so the
    * badge stayed on Following and the tap read as ignored.
    */
+  /** Which slice is on screen: everything, the people you follow, your circles. */
+  kind: FeedKind;
+  setKind: (kind: FeedKind) => void;
   followState: ReadonlyMap<string, boolean>;
   setFollowed: (userId: string, following: boolean) => void;
   /**
@@ -173,6 +182,15 @@ export function FeedProvider({ children }: { children: ReactNode }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  /*
+   * Which slice is on screen.
+   *
+   * Held here rather than on the home screen so that everything the feed owns —
+   * the list, the cursor, the end-of-feed flag — moves with it in one place. A
+   * screen holding the choice while this held the results would have to reach in
+   * and reset all three every time somebody tapped a tab.
+   */
+  const [kind, setKindState] = useState<FeedKind>('all');
   const [followState, setFollowState] = useState<ReadonlyMap<string, boolean>>(() => new Map());
   const [savedPostIds, setSavedPostIds] = useState<ReadonlySet<string>>(() => new Set());
   const [composingPostId, setComposingPost] = useState<string | null>(null);
@@ -271,7 +289,12 @@ export function FeedProvider({ children }: { children: ReactNode }) {
       setError(null);
 
       try {
-        const page = await fetchFeed(token, reset ? undefined : (cursor.current ?? undefined));
+        const page = await fetchFeed(
+          token,
+          reset ? undefined : (cursor.current ?? undefined),
+          undefined,
+          kind
+        );
         cursor.current = page.meta.next_cursor;
         atEnd.current = page.meta.next_cursor === null;
         setHasMore(!atEnd.current);
@@ -289,7 +312,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
         inFlight.current = false;
       }
     },
-    [token, applyFollowState, adoptSavedState]
+    [token, kind, applyFollowState, adoptSavedState]
   );
 
   useEffect(() => {
@@ -303,6 +326,28 @@ export function FeedProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [load]);
+
+  /**
+   * Show a different slice.
+   *
+   * The list, the cursor and the end flag all go with it: a cursor is a
+   * position in the query that produced it, so carrying one across would ask
+   * the following feed to resume where the whole feed left off and get back
+   * either nothing or the wrong page. Blanking the rows is what stops the
+   * previous slice showing underneath while the new one loads.
+   */
+  const setKind = useCallback((next: FeedKind) => {
+    setKindState((current) => {
+      if (current === next) return current;
+
+      cursor.current = null;
+      atEnd.current = false;
+      failed.current = false;
+      setPosts([]);
+      setHasMore(true);
+      return next;
+    });
+  }, []);
 
   const refresh = useCallback(async () => {
     atEnd.current = false;
@@ -486,6 +531,8 @@ export function FeedProvider({ children }: { children: ReactNode }) {
       restorePost,
       postEdits,
       replacePost,
+      kind,
+      setKind,
       followState,
       setFollowed,
       adoptFollowState,
@@ -513,6 +560,8 @@ export function FeedProvider({ children }: { children: ReactNode }) {
       restorePost,
       postEdits,
       replacePost,
+      kind,
+      setKind,
       followState,
       setFollowed,
       adoptFollowState,

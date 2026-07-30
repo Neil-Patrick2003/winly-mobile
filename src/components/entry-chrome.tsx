@@ -5,7 +5,8 @@ import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors } from '@/constants/theme';
-import { PILLAR_ORDER, type Pillar } from '@/lib/entry-draft';
+import { useConfirm } from '@/lib/confirm';
+import { buildWins, PILLAR_ORDER, useEntryDraft, type Pillar } from '@/lib/entry-draft';
 import { goBack } from '@/lib/navigation';
 
 /**
@@ -94,13 +95,49 @@ export function useDismissEntryFlow() {
 }
 
 /**
+ * Leave the flow, asking first where there is something to lose.
+ *
+ * The draft lives in a provider that unmounts with the flow, so closing is not
+ * a pause — everything typed, picked and timed goes with it. That is worth a
+ * question, and worth *not* asking when the answer could not matter: somebody
+ * who opened the flow and immediately thought better of it has nothing to
+ * discard, and a dialog there is just another tap between them and the way out.
+ */
+export function useLeaveEntryFlow() {
+  const dismiss = useDismissEntryFlow();
+  const { draft } = useEntryDraft();
+  const confirm = useConfirm();
+
+  // The same bar Review applies, plus the caption — a caption alone cannot be
+  // shared, but it is still something somebody wrote.
+  const hasProgress = buildWins(draft).length > 0 || draft.caption.trim().length > 0;
+
+  return useCallback(async () => {
+    if (!hasProgress) {
+      dismiss();
+      return;
+    }
+
+    const discard = await confirm({
+      title: 'Discard this win?',
+      message: 'Everything you have entered will be erased, and nothing will be shared.',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep editing',
+      destructive: true,
+    });
+
+    if (discard) dismiss();
+  }, [confirm, dismiss, hasProgress]);
+}
+
+/**
  * Title bar and standing subtitle, on every screen of the flow. There is no
  * back control here — stepping backward is the footer's job, and the close
  * button is the only way out.
  */
 export function EntryHeader() {
   const insets = useSafeAreaInsets();
-  const dismissFlow = useDismissEntryFlow();
+  const leaveFlow = useLeaveEntryFlow();
 
   return (
     <View className="bg-surface-card" style={{ paddingTop: insets.top + 6 }}>
@@ -108,7 +145,7 @@ export function EntryHeader() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Close"
-          onPress={dismissFlow}
+          onPress={() => void leaveFlow()}
           hitSlop={8}
           className="h-9 w-9 items-center justify-center rounded-full bg-surface active:opacity-60">
           <SymbolView

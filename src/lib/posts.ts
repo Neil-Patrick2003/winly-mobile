@@ -596,15 +596,40 @@ export async function deleteComment(commentId: string, token: string) {
 const PER_PAGE = 15;
 
 /**
+ * Which slice of the feed to ask for.
+ *
+ * Not three audiences but three ways of arriving at the same posts, so one post
+ * can appear under more than one — a win by somebody you follow, shared into a
+ * circle you are in, is in all three. None of them is a privacy boundary: a
+ * circle is where a win is placed, not who it is kept from.
+ */
+export const FEED_KINDS = [
+  { key: 'all', label: 'For You' },
+  { key: 'following', label: 'Following' },
+  { key: 'circles', label: 'Circles' },
+] as const;
+
+export type FeedKind = (typeof FEED_KINDS)[number]['key'];
+
+/**
  * GET /api/v1/posts — newest first, cursor paginated.
  *
  * `meta.next_cursor` is null on the last page; that, rather than an empty
  * `data`, is what says there is nothing more to ask for. Cursors are opaque and
- * come only from the server — never build one.
+ * come only from the server — never build one, and never carry one across
+ * kinds: a cursor is a position in the query that produced it.
  */
-export async function fetchFeed(token: string, cursor?: string, perPage = PER_PAGE) {
+export async function fetchFeed(
+  token: string,
+  cursor?: string,
+  perPage = PER_PAGE,
+  kind: FeedKind = 'all'
+) {
   const query = new URLSearchParams({ per_page: String(perPage) });
   if (cursor) query.set('cursor', cursor);
+  // Left off for the default, so the common request is the plain one the server
+  // would have answered anyway.
+  if (kind !== 'all') query.set('feed', kind);
 
   return apiGet<Page<Post>>(`/api/v1/posts?${query.toString()}`, token);
 }

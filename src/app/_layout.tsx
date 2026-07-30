@@ -10,6 +10,7 @@ import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { Colors } from '@/constants/theme';
 import { useBrandFonts } from '@/hooks/use-brand-fonts';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
+import { ConfirmProvider } from '@/lib/confirm';
 import { FeedProvider } from '@/lib/feed-context';
 import { ToastProvider } from '@/lib/toast';
 
@@ -66,12 +67,17 @@ export default function RootLayout() {
           {/* Above the navigator, so a confirmation outlives the screen that
               raised it — sharing a win dismisses the entry modal. */}
           <ToastProvider>
-            {/* Above the navigator too, so sharing a win can drop the created
-                post straight into the feed the tabs are showing. */}
-            <FeedProvider>
-              <AnimatedSplashOverlay />
-              <RootNavigator />
-            </FeedProvider>
+            {/* Above the navigator for the same reason, and above it in the
+                tree so its modal draws over every screen — a dialog asking
+                whether to leave has to outlive the leaving. */}
+            <ConfirmProvider>
+              {/* Above the navigator too, so sharing a win can drop the created
+                  post straight into the feed the tabs are showing. */}
+              <FeedProvider>
+                <AnimatedSplashOverlay />
+                <RootNavigator />
+              </FeedProvider>
+            </ConfirmProvider>
           </ToastProvider>
         </AuthProvider>
       </ScopedTheme>

@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ImageWithPlaceholder } from '@/components/ui/image';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
+import { useConfirm } from '@/lib/confirm';
 import { useFeed } from '@/lib/feed-context';
 import { setFollowing as setFollowingRemote } from '@/lib/posts';
 import { fetchFollows, type UserSummary } from '@/lib/stories';
@@ -28,6 +29,7 @@ function PersonRow({ person }: { person: UserSummary }) {
   const { token, user } = useAuth();
   const { followState, setFollowed } = useFeed();
   const showToast = useToast();
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
 
   const isSelf = person.id === user?.id;
@@ -46,6 +48,20 @@ function PersonRow({ person }: { person: UserSummary }) {
     if (!token || busy) return;
 
     const next = !isFollowing;
+
+    // Only on the way out. Following is cheap to undo and asking would make the
+    // common action the slower one; unfollowing is the one people do by
+    // mistake, tapping a row they meant to open.
+    if (!next) {
+      const confirmed = await confirm({
+        title: `Unfollow ${person.full_name}?`,
+        message: 'Their wins will stop appearing in your feed.',
+        confirmLabel: 'Unfollow',
+        destructive: true,
+      });
+      if (!confirmed) return;
+    }
+
     setBusy(true);
     setFollowed(person.id, next);
     try {
