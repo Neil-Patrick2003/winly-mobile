@@ -24,7 +24,7 @@ import {
 } from '@/lib/circles';
 import {
   fetchNotifications,
-  markNotificationsRead,
+  markNotificationRead,
   type AppNotification,
 } from '@/lib/notifications';
 import { ImageWithPlaceholder } from '@/components/ui/image';
@@ -212,21 +212,37 @@ export default function NotificationsScreen() {
     }, [])
   );
 
-  /** Settle one row locally, so acting on it shows immediately. */
-  const markOneRead = useCallback((id: string) => {
-    setAlerts((previous) =>
-      previous.map((row) => (row.id === id ? { ...row, is_read: true } : row))
-    );
-  }, []);
+  /**
+   * Settle the row that was acted on — that one and no other.
+   *
+   * Local first so the tint changes under the finger, then the server. Opening
+   * the screen used to mark everything read, so a single tap settled every
+   * alert waiting behind it; now only what you actually opened is read.
+   *
+   * A failed request is left alone rather than reported: the row reads as
+   * settled either way, and the next load will say what the server thinks.
+   */
+  const markOneRead = useCallback(
+    (id: string) => {
+      setAlerts((previous) =>
+        previous.map((row) => (row.id === id ? { ...row, is_read: true } : row))
+      );
+
+      if (token) void markNotificationRead(id, token).catch(() => undefined);
+    },
+    [token]
+  );
 
   /*
    * Re-read on every arrival, not just the first.
    *
-   * Opening the list clears the badge server-side, but the rows keep their
-   * unread tint so you can still see what was new. Coming back from whatever
-   * a row opened is the moment that stops being useful — so the list is
-   * fetched again and everything settles to what the server now says, without
+   * Coming back from whatever a row opened is the moment the list is stale —
+   * so it is fetched again and settles to what the server now says, without
    * anybody having to pull to refresh.
+   *
+   * Nothing is marked read here. Arriving at a list is not reading it, and
+   * doing both in one breath meant the unread tint was gone before you had
+   * looked at what was new.
    */
   useFocusEffect(
     useCallback(() => {
@@ -234,12 +250,11 @@ export default function NotificationsScreen() {
       (async () => {
         await refresh();
         if (!cancelled) setLoading(false);
-        if (token) await markNotificationsRead(token).catch(() => undefined);
       })();
       return () => {
         cancelled = true;
       };
-    }, [refresh, token])
+    }, [refresh])
   );
 
   const loadMore = useCallback(async () => {

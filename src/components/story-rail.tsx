@@ -93,6 +93,7 @@ function OwnBubble({
   uri,
   name,
   hasStory,
+  hasNewActivity,
   accent,
   onPress,
   onAdd,
@@ -100,6 +101,8 @@ function OwnBubble({
   uri: string | null;
   name: string;
   hasStory: boolean;
+  /** A story posted and not yet checked, or watched since you last checked. */
+  hasNewActivity: boolean;
   accent: string;
   /** Watch your story, or start one when there is none. */
   onPress: () => void;
@@ -122,9 +125,17 @@ function OwnBubble({
         onPress={onPress}
         className="items-center gap-2 active:opacity-70">
         {hasStory ? (
-          // Always bright: your own ring tracks whether you have something up,
-          // not whether you have watched it. You know what you posted.
-          <RingedAvatar uri={uri} name={name} seen={false} />
+          /*
+           * Lit while there is something waiting on the viewer list.
+           *
+           * It used to be lit for as long as a story was up, which restated
+           * something you already knew — you posted it. Your own ring cannot
+           * mean "unwatched" the way everyone else's does, so it means the two
+           * things you might not have caught up on: a story you have just put
+           * up and not looked at yet, and anybody who has watched since you
+           * last did. Opening the viewers is what puts it out.
+           */
+          <RingedAvatar uri={uri} name={name} seen={!hasNewActivity} />
         ) : (
           <View
             className="items-center justify-center rounded-full border-2 border-dashed"
@@ -238,6 +249,7 @@ export function StoryRail({ accent }: { accent: string }) {
           uri={user?.avatar_url ?? null}
           name={user?.full_name ?? 'You'}
           hasStory={user?.has_active_story ?? false}
+          hasNewActivity={user?.has_new_story_activity ?? false}
           accent={accent}
           // With a story to show, the bubble watches it and the badge adds
           // another — the split Messenger and Instagram both use. With none,
