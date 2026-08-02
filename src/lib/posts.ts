@@ -58,9 +58,20 @@ export type LikeCounts = {
   viewer_has_liked: boolean;
 };
 
+/**
+ * Who a win was shared with.
+ *
+ * `all_circles` and `custom` reach the same people — the members of the circles
+ * the post sits in — and differ only in what the author was asked. They are
+ * kept apart so the edit screen can reopen on the choice that was made.
+ */
+export type PostVisibility = 'public' | 'all_circles' | 'custom';
+
 export type Post = LikeCounts & {
   id: string;
   caption: string | null;
+  /** Who it went to. A circle post is served to its members and nobody else. */
+  visibility: PostVisibility;
   comments_count: number;
   shares_count: number;
   created_at: string;
@@ -166,7 +177,15 @@ export type CreatePostInput = {
   /** At least one — a post with no wins is rejected. */
   wins: NewWin[];
   /**
-   * The circles to share into, or absent to share with everybody.
+   * Who the win is for. Required: the server refuses to guess how widely to
+   * share something, and so does this.
+   */
+  visibility: PostVisibility;
+  /**
+   * The circles to share into. Sent only with `custom`, and refused with the
+   * other two rather than ignored — a list alongside `public` means the client
+   * has misunderstood, and dropping it quietly would leave it believing a win
+   * went somewhere it did not.
    *
    * One post reaches all of them — it is not copied per circle, so it keeps one
    * comment thread and one set of likes however widely it is shared.
@@ -346,7 +365,14 @@ export type UpdatePostInput = {
   caption?: string;
   /** At least one — the last win cannot be edited away, only deleted. */
   wins: UpdateWin[];
-  /** Omit to leave the sharing alone; an empty list unshares from every circle. */
+  /**
+   * Required, like the rest of an edit: the request says what the post should
+   * end up being. Left out, the server has no way to tell "keep the audience"
+   * from "the screen forgot to send it", and the safe reading of that is not
+   * one it should have to make.
+   */
+  visibility: PostVisibility;
+  /** Sent only with `custom`, exactly as when creating. */
   circle_ids?: string[];
 };
 

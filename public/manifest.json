@@ -1,13 +1,13 @@
 {
-  "name": "Winly — Your Feed for Personal Growth",
-  "short_name": "Winly",
+  "name": "Welle — Your Feed for Personal Growth",
+  "short_name": "Welle",
   "description": "Share your self-care, celebrate small wins, and grow together.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F8FAFC",
-  "theme_color": "#22C55E",
+  "background_color": "#F4F7F2",
+  "theme_color": "#2E7D56",
   "icons": [
     {
       "src": "/icons/pwa-192.png",

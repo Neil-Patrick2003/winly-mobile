@@ -1,5 +1,5 @@
 /*
- * Winly's service worker: the least a browser needs to treat the export as an
+ * Welle's service worker: the least a browser needs to treat the export as an
  * installable app, and deliberately no more.
  *
  * Expo warns about service workers for a real reason — a worker that serves the
@@ -23,7 +23,7 @@
  * Bumping CACHE drops every cache that came before it, which is the manual
  * escape hatch if a release ever does get stuck.
  */
-const CACHE = 'winly-v1';
+const CACHE = 'welle-v1';
 
 /** The shell to fall back to when a navigation cannot reach the network. */
 const OFFLINE_URLS = ['/'];

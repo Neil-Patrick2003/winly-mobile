@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AudiencePicker, type AudienceCircle } from '@/components/audience-picker';
 import { PILLAR_THEME } from '@/components/entry-chrome';
 import { Chip } from '@/components/ui/chip';
 import { Field } from '@/components/ui/field';
@@ -20,6 +21,7 @@ import { MediaPicker } from '@/components/ui/media-picker';
 import { TextArea } from '@/components/ui/text-area';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
+import { fetchCircles } from '@/lib/circles';
 import { ACTIVITIES, isMovementAnswered, OTHER_ACTIVITY } from '@/lib/entry-draft';
 import { useFeed } from '@/lib/feed-context';
 import { formatDuration, MEDITATION_DURATIONS } from '@/lib/meditation';
@@ -34,6 +36,7 @@ import {
   type LocalFile,
   type Media,
   type Post,
+  type PostVisibility,
   type UpdateWin,
   type WinType,
 } from '@/lib/posts';
@@ -287,6 +290,23 @@ export default function EditPostScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  /*
+   * The audience, seeded from the post rather than defaulted.
+   *
+   * An edit restates the whole post, so the screen has to open on the choice
+   * that was actually made — opening on a default would quietly re-share a
+   * circle win to everybody the first time somebody fixed a typo.
+   */
+  const [visibility, setVisibility] = useState<PostVisibility>('all_circles');
+  const [chosenCircleIds, setChosenCircleIds] = useState<string[]>([]);
+  const [circles, setCircles] = useState<AudienceCircle[]>([]);
+
+  const toggleCircle = useCallback((id: string) => {
+    setChosenCircleIds((chosen) =>
+      chosen.includes(id) ? chosen.filter((each) => each !== id) : [...chosen, id],
+    );
+  }, []);
+
   useEffect(() => {
     if (!token || !postId) return;
 
@@ -300,6 +320,8 @@ export default function EditPostScreen() {
         setPost(loaded);
         setForm(formFor(loaded));
         setCaption(loaded.caption ?? '');
+        setVisibility(loaded.visibility);
+        setChosenCircleIds((loaded.circles ?? []).map((circle) => circle.id));
       } catch (caught) {
         if (!cancelled) {
           setLoadError(caught instanceof Error ? caught.message : 'That post could not be loaded.');
@@ -311,6 +333,27 @@ export default function EditPostScreen() {
       cancelled = true;
     };
   }, [postId, token]);
+
+  /* Every circle the author could move the post to. */
+  useEffect(() => {
+    if (!token) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const page = await fetchCircles(token, undefined, 50);
+        if (!cancelled) {
+          setCircles(page.data.map((circle) => ({ id: circle.id, name: circle.name })));
+        }
+      } catch {
+        // Left empty: the picker then offers Public alone, which is honest
+        // about what this screen can currently promise.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   const patch = useCallback((type: WinType, change: Partial<PillarForm>) => {
     setForm((previous) =>
@@ -327,6 +370,13 @@ export default function EditPostScreen() {
       return;
     }
 
+    // "Choose circles" with nothing ticked leaves the post addressed to nobody,
+    // which the server refuses. Said here rather than as a 422.
+    if (visibility === 'custom' && chosenCircleIds.length === 0) {
+      showToast('Pick at least one circle to share with.');
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -340,7 +390,12 @@ export default function EditPostScreen() {
        */
       const saved = await updatePost(
         post.id,
-        { wins: winsFrom(form), caption: caption.trim() },
+        {
+          wins: winsFrom(form),
+          caption: caption.trim(),
+          visibility,
+          ...(visibility === 'custom' ? { circle_ids: chosenCircleIds } : {}),
+        },
         token,
       );
 
@@ -442,6 +497,20 @@ export default function EditPostScreen() {
               onChangeText={setCaption}
               className="min-h-28 rounded-2xl border border-hairline bg-surface px-4 py-3.5 font-sans text-[15px] text-ink"
               maxLength={1000}
+            />
+          </View>
+
+          {/* The audience is part of the post, so it is edited alongside it.
+              An edit restates the whole thing, and leaving this out would mean
+              the server could not tell "keep the audience" from a screen that
+              forgot to send one. */}
+          <View className="rounded-2xl bg-surface-card p-4">
+            <AudiencePicker
+              circles={circles}
+              visibility={visibility}
+              onChangeVisibility={setVisibility}
+              chosenCircleIds={chosenCircleIds}
+              onToggleCircle={toggleCircle}
             />
           </View>
 

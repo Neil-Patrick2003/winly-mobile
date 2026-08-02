@@ -31,7 +31,7 @@ export default function EntryIntroScreen() {
         contentContainerStyle={{ paddingTop: 28, paddingBottom: insets.bottom + 24 }}>
         <View className="items-center gap-3">
           <Image
-            source={require('@/assets/images/brand/logo.png')}
+            source={require('@/assets/images/brand/welle_logo.png')}
             className="h-[104px] w-[104px]"
             contentFit="contain"
           />

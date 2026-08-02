@@ -1,10 +1,25 @@
 import { useGlobalSearchParams } from 'expo-router';
 import type { SymbolViewProps } from 'expo-symbols';
-import { createContext, use, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  use,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 
 import { useAuth } from '@/lib/auth-context';
 import { fetchCircles } from '@/lib/circles';
-import { createPost, toMovementType, type LocalFile, type NewWin, type Post } from '@/lib/posts';
+import {
+  createPost,
+  toMovementType,
+  type LocalFile,
+  type NewWin,
+  type Post,
+  type PostVisibility,
+} from '@/lib/posts';
 
 /**
  * The in-progress small win, shared across the flow's step screens. Living at
@@ -169,18 +184,29 @@ type EntryDraftValue = {
    */
   submit: () => Promise<Post>;
   /**
-   * The circles this win is bound for.
+   * Every circle the author could share into.
    *
-   * Opened from a circle, that is the one circle. Opened from anywhere else it
-   * is every circle you are in — one post reaching all of them, rather than a
-   * copy per circle. Empty means the open feed only.
+   * Opened from a circle, that is the one circle and the only one. Opened from
+   * anywhere else it is all of them, and `visibility` decides which are used.
    */
   targets: { id: string; name: string }[];
   /**
-   * True when the flow was opened from a particular circle, which is the only
-   * thing that narrows where the win goes. Review says which either way.
+   * True when the flow was opened from a particular circle, which pins the win
+   * to it. There is no audience to choose in that case — the choice was made
+   * by opening the flow where it was opened.
    */
   lockedToCircle: boolean;
+  /** Who the win is for. */
+  visibility: PostVisibility;
+  setVisibility: (visibility: PostVisibility) => void;
+  /**
+   * The circles picked by hand, meaningful only under `custom`.
+   *
+   * Kept while the author moves between options so that flicking to Public and
+   * back does not throw away a selection they made a moment ago.
+   */
+  chosenCircleIds: string[];
+  toggleCircle: (id: string) => void;
 };
 
 /** The server caps `circle_ids` at 50; one page of circles is plenty under it. */
@@ -235,11 +261,32 @@ export function EntryDraftProvider({ children }: { children: ReactNode }) {
 
   const targets = useMemo(() => (opened ? [opened] : mine), [opened, mine]);
 
+  /*
+   * Circles by default, not public.
+   *
+   * Sharing wider than intended cannot be taken back once it has been read,
+   * and sharing narrower can be fixed by sharing again — so where the two
+   * defaults disagree, the quiet one wins. Opened from a circle, the audience
+   * is that circle and the picker does not appear at all.
+   */
+  const [visibility, setVisibility] = useState<PostVisibility>('all_circles');
+  const [chosenCircleIds, setChosenCircleIds] = useState<string[]>([]);
+
+  const toggleCircle = useCallback((id: string) => {
+    setChosenCircleIds((chosen) =>
+      chosen.includes(id) ? chosen.filter((each) => each !== id) : [...chosen, id]
+    );
+  }, []);
+
   const value = useMemo<EntryDraftValue>(
     () => ({
       draft,
       targets,
       lockedToCircle,
+      visibility,
+      setVisibility,
+      chosenCircleIds,
+      toggleCircle,
       patchMeditation: (patch) =>
         setDraft((d) => ({ ...d, meditation: { ...d.meditation, ...patch } })),
       patchLearning: (patch) => setDraft((d) => ({ ...d, learning: { ...d.learning, ...patch } })),
@@ -252,21 +299,29 @@ export function EntryDraftProvider({ children }: { children: ReactNode }) {
         if (wins.length === 0) throw new Error('Add something to share first.');
 
         const caption = buildCaption(draft);
-        // One request carrying every win, so the three pillars land as a single
-        // moment in the feed and cannot half-succeed.
+
         /*
-         * Every circle it is bound for, in one request: the win is one post
-         * reaching all of them rather than a copy sitting in each. There is no
-         * choice to make here — a win is public and goes to your circles, and
-         * a switch offering otherwise was a decision nobody wanted to take.
+         * One request carrying every win, so the three pillars land as a single
+         * moment in the feed and cannot half-succeed.
+         *
+         * Opened from a circle, the win goes to that circle and no other: the
+         * audience was chosen by where the flow was opened, and offering a
+         * picker afterwards would be asking a question already answered.
+         *
+         * `circle_ids` goes only with `custom`. The server refuses a list
+         * alongside the other two rather than ignoring it, which is what keeps
+         * this honest — a mismatch here is a 422, not a win quietly landing
+         * somewhere nobody meant.
          */
-        const circleIds = targets.map((circle) => circle.id);
+        const sharing: PostVisibility = lockedToCircle ? 'custom' : visibility;
+        const circleIds = lockedToCircle ? targets.map((circle) => circle.id) : chosenCircleIds;
 
         const post = await createPost(
           {
             wins,
+            visibility: sharing,
             ...(caption ? { caption } : {}),
-            ...(circleIds.length > 0 ? { circle_ids: circleIds } : {}),
+            ...(sharing === 'custom' ? { circle_ids: circleIds } : {}),
           },
           token
         );
@@ -275,7 +330,7 @@ export function EntryDraftProvider({ children }: { children: ReactNode }) {
         return post;
       },
     }),
-    [draft, token, targets, lockedToCircle]
+    [draft, token, targets, lockedToCircle, visibility, chosenCircleIds, toggleCircle]
   );
 
   return <EntryDraftContext.Provider value={value}>{children}</EntryDraftContext.Provider>;

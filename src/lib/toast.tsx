@@ -106,7 +106,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   web: 'check_circle',
                 }}
                 size={19}
-                tintColor="#5FBC88"
+                tintColor="#2E7D56"
               />
               <Text className="font-body-semibold text-[15px] leading-5 text-ink">
                 {toast.message}

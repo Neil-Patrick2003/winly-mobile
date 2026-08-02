@@ -32,7 +32,7 @@ export function ProfileCover({
 
   return (
     <View
-      className="overflow-hidden bg-linear-to-r from-green-400 via-sky-400 to-violet-400"
+      className="overflow-hidden bg-primary"
       style={{ height }}>
       {resolved ? (
         <Image

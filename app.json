@@ -1,17 +1,17 @@
 {
   "expo": {
-    "name": "winly",
+    "name": "Welle",
     "slug": "winly",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/brand/generated/welle-icon-1024.png",
     "scheme": "winly",
     "userInterfaceStyle": "automatic",
     "ios": {},
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png"
+        "backgroundColor": "#073729",
+        "foregroundImage": "./assets/images/brand/generated/welle-adaptive-1024.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.neilpatrick.winly",
@@ -35,8 +35,8 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#22C55E",
-          "image": "./assets/images/brand/logo.png",
+          "backgroundColor": "#2E7D56",
+          "image": "./assets/images/brand/welle_logo.png",
           "imageWidth": 132
         }
       ],
@@ -52,14 +52,14 @@
         "expo-notifications",
         {
           "icon": "./assets/images/notification-icon.png",
-          "color": "#22C55E",
+          "color": "#2E7D56",
           "defaultChannel": "default"
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Winly needs access to your photos so you can attach one to a movement or learning entry."
+          "photosPermission": "Welle needs access to your photos so you can attach one to a movement or learning entry."
         }
       ]
     ],

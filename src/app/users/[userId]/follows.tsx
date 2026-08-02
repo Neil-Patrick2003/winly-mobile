@@ -92,7 +92,7 @@ function PersonRow({ person }: { person: UserSummary }) {
           size={AVATAR}
           accessibilityLabel={`${person.full_name} profile photo`}>
           <View
-            className="items-center justify-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500"
+            className="items-center justify-center rounded-full bg-primary"
             style={{ width: AVATAR, height: AVATAR }}>
             <Text className="font-heading-bold text-base leading-6 text-white">
               {(person.full_name.trim()[0] ?? '?').toUpperCase()}

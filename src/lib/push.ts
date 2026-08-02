@@ -73,9 +73,9 @@ async function ensureAndroidChannel() {
   if (Platform.OS !== 'android') return;
 
   await Notifications.setNotificationChannelAsync('default', {
-    name: 'Winly',
+    name: 'Welle',
     importance: Notifications.AndroidImportance.MAX,
-    lightColor: '#22C55E',
+    lightColor: '#2E7D56',
     vibrationPattern: [0, 250, 250, 250],
   });
 }
@@ -100,7 +100,7 @@ export async function registerForPush(authToken: string): Promise<string | null>
    * else to go on.
    */
   const skip = (reason: string) => {
-    if (__DEV__) console.info(`[winly] Push not registered: ${reason}`);
+    if (__DEV__) console.info(`[welle] Push not registered: ${reason}`);
     return null;
   };
 

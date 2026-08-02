@@ -84,14 +84,14 @@ export default function Root({ children }: PropsWithChildren) {
         <link rel="manifest" href="/manifest.json" />
         {/* The green the splash screen and the primary button already wear, so
             the browser chrome matches the app it is framing. */}
-        <meta name="theme-color" content="#22C55E" />
+        <meta name="theme-color" content="#2E7D56" />
 
         {/* iOS reads none of the manifest: standalone mode, the home-screen
             icon and the name under it are all still declared with these. */}
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Winly" />
+        <meta name="apple-mobile-web-app-title" content="Welle" />
         <link rel="apple-touch-icon" href="/icons/pwa-192.png" />
 
         <ScrollViewStyleReset />

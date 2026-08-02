@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AudiencePicker } from '@/components/audience-picker';
 import { EntryHeader, PILLAR_THEME, useDismissEntryFlow } from '@/components/entry-chrome';
 import { TextArea } from '@/components/ui/text-area';
 import { Colors } from '@/constants/theme';
@@ -40,7 +41,17 @@ const photoCount = (n: number) => `${n} photo${n === 1 ? '' : 's'} attached`;
  */
 export default function ReviewStepScreen() {
   const insets = useSafeAreaInsets();
-  const { draft, setCaption, submit, targets, lockedToCircle } = useEntryDraft();
+  const {
+    draft,
+    setCaption,
+    submit,
+    targets,
+    lockedToCircle,
+    visibility,
+    setVisibility,
+    chosenCircleIds,
+    toggleCircle,
+  } = useEntryDraft();
   const { prepend } = useFeed();
   const { refreshUser } = useAuth();
   const dismissFlow = useDismissEntryFlow();
@@ -97,7 +108,15 @@ export default function ReviewStepScreen() {
   // nothing to send for a caption on its own — nor for a pillar carrying only
   // photos, which cannot be uploaded yet.
   const wins = buildWins(draft);
-  const canShare = wins.length > 0 && !sharing;
+
+  /*
+   * "Choose circles" with nothing ticked is a win addressed to nobody, and the
+   * server refuses it. Said here by a button that will not press rather than
+   * there by a 422 after the round trip.
+   */
+  const audienceChosen =
+    lockedToCircle || visibility !== 'custom' || chosenCircleIds.length > 0;
+  const canShare = wins.length > 0 && audienceChosen && !sharing;
 
   const share = async () => {
     if (!canShare) return;
@@ -210,42 +229,41 @@ export default function ReviewStepScreen() {
           ) : null}
         </View>
 
-        {/* Where it is going, said before it goes — a statement, not a choice.
-            Everyone can read it either way; circles are extra walls it appears
-            on, not a smaller audience. One post reaches every circle listed, so
-            nobody sees it twice for being in more than one of them. */}
-        {targets.length > 0 ? (
+        {/* Who it is going to, chosen before it goes.
+            A circle is an audience now and not just another wall: a win shared
+            into one is served to its members and to nobody else. One post
+            reaches every circle listed, so nobody sees it twice for being in
+            more than one of them. */}
+        {lockedToCircle ? (
           <View className="mt-6 flex-row items-center gap-2.5 rounded-2xl bg-surface-card px-4 py-3.5">
             <SymbolView
               name={{ ios: 'person.2', android: 'group', web: 'group' }}
               size={16}
               tintColor={Colors.light.textSecondary}
             />
-
-            <View className="flex-1">
-              <Text className="font-sans text-[13px] leading-[18px] text-ink-muted">
-                Everyone will see this. Also posting to{' '}
-                <Text className="font-body-semibold text-ink">
-                  {lockedToCircle || targets.length === 1
-                    ? targets[0].name
-                    : `all ${targets.length} of your circles`}
-                </Text>
-              </Text>
-              {!lockedToCircle && targets.length > 1 ? (
-                <Text className="mt-0.5 font-sans text-[12px] leading-4 text-ink-muted">
-                  One post — nobody sees it more than once.
-                </Text>
-              ) : null}
-            </View>
+            <Text className="flex-1 font-sans text-[13px] leading-[18px] text-ink-muted">
+              Sharing with <Text className="font-body-semibold text-ink">{targets[0].name}</Text>.
+              Only its members will see this.
+            </Text>
           </View>
-        ) : null}
+        ) : (
+          <View className="mt-6">
+            <AudiencePicker
+              circles={targets}
+              visibility={visibility}
+              onChangeVisibility={setVisibility}
+              chosenCircleIds={chosenCircleIds}
+              onToggleCircle={toggleCircle}
+            />
+          </View>
+        )}
 
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ disabled: !canShare }}
           disabled={!canShare}
           onPress={share}
-          className={`mt-6 items-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500 py-4 active:opacity-85 ${
+          className={`mt-6 items-center rounded-full bg-primary py-4 active:opacity-85 ${
             canShare ? '' : 'opacity-40'
           }`}
           style={canShare ? { boxShadow: '0 8px 20px rgba(34, 197, 94, 0.35)' } : undefined}>

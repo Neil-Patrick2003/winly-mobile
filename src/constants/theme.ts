@@ -6,26 +6,33 @@
 import { Platform } from 'react-native';
 
 /**
- * Winly brand palette — "Fresh Growth". Raw brand values, unchanged across
- * schemes. Prefer the scheme-aware `Colors` below when styling UI; reach for
- * `Brand` only when a value must stay identical in light and dark (logo, splash).
+ * Welle brand palette — "Forest". Raw brand values, unchanged across schemes.
+ * Prefer the scheme-aware `Colors` below when styling UI; reach for `Brand` only
+ * when a value must stay identical in light and dark (logo, splash).
+ *
+ * Four colours and a page. `forest` is the darkest of them and doubles as the
+ * text colour, which is what keeps the type in the same family as everything
+ * else rather than sitting on it as neutral slate.
  */
 export const Brand = {
-  primary: '#22C55E',
-  secondary: '#38BDF8',
-  accent: '#8B5CF6',
+  forest: '#0F3D2E',
+  primary: '#2E7D56',
+  secondary: '#4DB6AC',
+  accent: '#5A7BD8',
   highlight: '#FB7185',
   success: '#FACC15',
 } as const;
 
 export const Colors = {
   light: {
-    text: '#0F172A',
-    textSecondary: '#64748B',
-    background: '#F8FAFC',
+    text: Brand.forest,
+    // The greys are tinted towards the green rather than left on slate: a warm
+    // page under cool type reads as a background someone swapped, not a palette.
+    textSecondary: '#4F7263',
+    background: '#F4F7F2',
     backgroundElement: '#FFFFFF',
-    backgroundSelected: '#E2E8F0',
-    border: '#E2E8F0',
+    backgroundSelected: '#E7EDE4',
+    border: '#E1E9DE',
     primary: Brand.primary,
     secondary: Brand.secondary,
     accent: Brand.accent,
@@ -34,19 +41,21 @@ export const Colors = {
     onPrimary: '#FFFFFF',
   },
   dark: {
-    text: '#F8FAFC',
-    textSecondary: '#94A3B8',
-    background: '#0F172A',
-    backgroundElement: '#1E293B',
-    backgroundSelected: '#334155',
-    border: '#334155',
-    // Lifted toward the lighter end of each hue so they clear contrast on slate.
-    primary: '#4ADE80',
-    secondary: '#7DD3FC',
-    accent: '#A78BFA',
+    text: '#F4F7F2',
+    textSecondary: '#A3BFB2',
+    // The page is the brand green taken darker still, so a card sitting on it
+    // can be the brand green itself.
+    background: '#0B241B',
+    backgroundElement: Brand.forest,
+    backgroundSelected: '#1C5641',
+    border: '#1C5641',
+    // Lifted toward the lighter end of each hue so they clear contrast on it.
+    primary: '#4DB07C',
+    secondary: '#6ECFC6',
+    accent: '#8AA4E6',
     highlight: '#FDA4AF',
     success: '#FDE047',
-    onPrimary: '#052E16',
+    onPrimary: '#06251A',
   },
 } as const;
 
@@ -90,9 +99,9 @@ export const Fonts = {
   /** Wordmark only — Plus Jakarta Sans Bold */
   logo: 'PlusJakartaSans_700Bold',
   logoExtraBold: 'PlusJakartaSans_800ExtraBold',
-  /** Headings — Sora SemiBold */
-  heading: 'Sora_600SemiBold',
-  headingBold: 'Sora_700Bold',
+  /** Headings — Playfair Display */
+  heading: 'PlayfairDisplay_600SemiBold',
+  headingBold: 'PlayfairDisplay_700Bold',
   /** Body copy — Inter */
   body: 'Inter_400Regular',
   bodyMedium: 'Inter_500Medium',

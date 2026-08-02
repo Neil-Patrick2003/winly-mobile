@@ -39,6 +39,16 @@ export type User = {
    * story — so anything that posts or deletes one has to refresh the user.
    */
   has_active_story: boolean;
+  /**
+   * True when there is something about your own story you have not caught up
+   * on: one you have posted and not yet opened the viewers on, or somebody
+   * watching since the last time you did.
+   *
+   * What lights the ring on your own bubble. Everyone else's ring means "not
+   * watched yet", which cannot mean anything about your own — so yours means
+   * there is something waiting on the viewer list.
+   */
+  has_new_story_activity: boolean;
   bio: string | null;
   is_private: boolean;
   /** Null until the emailed verification link is followed. Informational only —

@@ -344,7 +344,7 @@ export default function UserProfileScreen() {
                 source={{ uri: profile.avatar_url }}
                 className="h-24 w-24 rounded-full"
                 accessibilityLabel={`${profile.full_name} profile photo`}>
-                <View className="h-24 w-24 items-center justify-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500">
+                <View className="h-24 w-24 items-center justify-center rounded-full bg-primary">
                   <Text className="font-heading-bold text-4xl leading-[44px] text-white">
                     {initial}
                   </Text>

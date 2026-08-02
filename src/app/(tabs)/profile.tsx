@@ -265,7 +265,7 @@ export default function ProfileScreen() {
         <Link href="/login" replace asChild>
           <Pressable
             accessibilityRole="button"
-            className="items-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500 px-8 py-3 active:opacity-85">
+            className="items-center rounded-full bg-primary px-8 py-3 active:opacity-85">
             <Text className="font-body-semibold text-base leading-6 text-white">Log In</Text>
           </Pressable>
         </Link>
@@ -299,7 +299,7 @@ export default function ProfileScreen() {
                 source={{ uri: user.avatar_url }}
                 className="h-24 w-24 rounded-full"
                 accessibilityLabel={`${user.full_name} profile photo`}>
-                <View className="h-24 w-24 items-center justify-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500">
+                <View className="h-24 w-24 items-center justify-center rounded-full bg-primary">
                   <Text className="font-heading-bold text-4xl leading-[44px] text-white">
                     {initial}
                   </Text>
@@ -308,7 +308,7 @@ export default function ProfileScreen() {
             </View>
 
             {user.has_active_story ? (
-              <View className="absolute bottom-1 right-1 h-5 w-5 rounded-full border-2 border-surface bg-[#4ADE80]" />
+              <View className="absolute bottom-1 right-1 h-5 w-5 rounded-full border-2 border-surface bg-primary" />
             ) : null}
           </View>
 

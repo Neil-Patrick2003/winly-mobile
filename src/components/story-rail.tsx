@@ -26,7 +26,7 @@ function Avatar({ uri, name, size }: { uri: string | null; name: string; size: n
         // Fills the placeholder rather than restating its size: the parent is
         // already exactly `size` square, and repeating the numbers here is a
         // second place to keep in step for no gain.
-        className="h-full w-full items-center justify-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500">
+        className="h-full w-full items-center justify-center rounded-full bg-primary">
         <Text
           className="font-heading-bold text-white"
           style={{ fontSize: size * 0.4, lineHeight: size * 0.5 }}>
@@ -62,7 +62,7 @@ function RingedAvatar({
   return (
     <View
       className={`rounded-full p-[2.5px] ${
-        seen ? 'bg-surface-selected' : 'bg-linear-to-tr from-green-400 via-sky-400 to-violet-400'
+        seen ? 'bg-surface-selected' : 'bg-primary'
       }`}>
       <View className="rounded-full bg-surface p-[2px]">
         <View style={{ width: BUBBLE, height: BUBBLE }}>
@@ -93,6 +93,7 @@ function OwnBubble({
   uri,
   name,
   hasStory,
+  hasNewActivity,
   accent,
   onPress,
   onAdd,
@@ -100,6 +101,8 @@ function OwnBubble({
   uri: string | null;
   name: string;
   hasStory: boolean;
+  /** A story posted and not yet checked, or watched since you last checked. */
+  hasNewActivity: boolean;
   accent: string;
   /** Watch your story, or start one when there is none. */
   onPress: () => void;
@@ -122,9 +125,17 @@ function OwnBubble({
         onPress={onPress}
         className="items-center gap-2 active:opacity-70">
         {hasStory ? (
-          // Always bright: your own ring tracks whether you have something up,
-          // not whether you have watched it. You know what you posted.
-          <RingedAvatar uri={uri} name={name} seen={false} />
+          /*
+           * Lit while there is something waiting on the viewer list.
+           *
+           * It used to be lit for as long as a story was up, which restated
+           * something you already knew — you posted it. Your own ring cannot
+           * mean "unwatched" the way everyone else's does, so it means the two
+           * things you might not have caught up on: a story you have just put
+           * up and not looked at yet, and anybody who has watched since you
+           * last did. Opening the viewers is what puts it out.
+           */
+          <RingedAvatar uri={uri} name={name} seen={!hasNewActivity} />
         ) : (
           <View
             className="items-center justify-center rounded-full border-2 border-dashed"
@@ -238,6 +249,7 @@ export function StoryRail({ accent }: { accent: string }) {
           uri={user?.avatar_url ?? null}
           name={user?.full_name ?? 'You'}
           hasStory={user?.has_active_story ?? false}
+          hasNewActivity={user?.has_new_story_activity ?? false}
           accent={accent}
           // With a story to show, the bubble watches it and the badge adds
           // another — the split Messenger and Instagram both use. With none,

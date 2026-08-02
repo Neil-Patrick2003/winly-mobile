@@ -552,7 +552,7 @@ export default function StoryViewerScreen() {
             source={{ uri: author?.avatar_url ?? null }}
             className="h-9 w-9 rounded-full"
             accessibilityLabel={`${author?.full_name ?? 'Author'} profile photo`}>
-            <View className="h-9 w-9 items-center justify-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500">
+            <View className="h-9 w-9 items-center justify-center rounded-full bg-primary">
               <Text className="font-heading-bold text-[13px] leading-[18px] text-white">
                 {(author?.full_name.trim()[0] ?? '?').toUpperCase()}
               </Text>

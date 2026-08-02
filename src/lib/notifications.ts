@@ -49,10 +49,32 @@ export async function fetchUnreadCount(token: string) {
   return response.data.unread;
 }
 
-/** POST /api/v1/notifications/read — everything, at the moment the list opens. */
+/**
+ * POST /api/v1/notifications/read — every unread one at once.
+ *
+ * Something the reader asks for outright. Opening the list no longer does it
+ * on their behalf: looking at a list is not the same as having read what is on
+ * it, and clearing the lot on arrival settled alerts nobody had seen.
+ */
 export async function markNotificationsRead(token: string) {
   const response = await apiPost<{ data: { unread: number } }>(
     '/api/v1/notifications/read',
+    undefined,
+    token
+  );
+
+  return response.data.unread;
+}
+
+/**
+ * POST /api/v1/notifications/{id}/read — the one that was acted on.
+ *
+ * Answers how many are still unread, so the bell can settle without a second
+ * request asking. Somebody else's is a 404, exactly as deleting one is.
+ */
+export async function markNotificationRead(id: string, token: string) {
+  const response = await apiPost<{ data: { id: string; unread: number } }>(
+    `/api/v1/notifications/${id}/read`,
     undefined,
     token
   );

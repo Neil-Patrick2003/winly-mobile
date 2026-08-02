@@ -47,7 +47,7 @@ export function MediaPicker({
     if (!permission.granted) {
       Alert.alert(
         'Photo access needed',
-        'Enable photo access for Winly in Settings to attach an image.'
+        'Enable photo access for Welle in Settings to attach an image.'
       );
       return;
     }
