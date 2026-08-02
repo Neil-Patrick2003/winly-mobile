@@ -40,7 +40,7 @@ function loadRealtime(): {
     };
   } catch (caught) {
     console.warn(
-      '[winly] Realtime is unavailable: the websocket libraries could not be loaded. ' +
+      '[welle] Realtime is unavailable: the websocket libraries could not be loaded. ' +
         'Notifications will arrive on the slower poll. On a device this usually means the dev ' +
         'client predates `@react-native-community/netinfo` and needs rebuilding.',
       caught
@@ -186,7 +186,7 @@ export function getEcho(token: string): EchoClient | null {
 
     unreachable = true;
     console.warn(
-      `[winly] Realtime gave up: nothing answered at ${SCHEME === 'https' ? 'wss' : 'ws'}://${HOST}:${PORT}/app. ` +
+      `[welle] Realtime gave up: nothing answered at ${SCHEME === 'https' ? 'wss' : 'ws'}://${HOST}:${PORT}/app. ` +
         'Notifications still arrive on the slower poll. Either Reverb is not running there, or /app is not ' +
         'proxied to it — or set EXPO_PUBLIC_REVERB_HOST/PORT to somewhere reachable.'
     );

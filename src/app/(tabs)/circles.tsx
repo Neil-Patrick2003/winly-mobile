@@ -10,7 +10,7 @@ import { useAuth } from '@/lib/auth-context';
 import { fetchCircles, type Circle } from '@/lib/circles';
 
 /** The green the tabs lean on, matching Home. */
-const GREEN = '#5FBC88';
+const GREEN = Colors.light.primary;
 
 function CircleRow({ circle }: { circle: Circle }) {
   const members = circle.members_count;

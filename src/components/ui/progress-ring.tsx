@@ -19,7 +19,7 @@ export function ProgressRing({
   color,
   size = 64,
   thickness = 5,
-  track = '#EAEDF3',
+  track = '#E7EDE4',
   children,
 }: {
   /** 0–1. Values outside the range are clamped rather than wrapping. */

@@ -460,17 +460,27 @@ const DELETE_ICON = {
   web: 'delete',
 } as const;
 
-/** Outline until liked, filled after — shape carries the state, not just colour. */
+/**
+ * Outline until liked, filled after — shape carries the state, not just colour.
+ *
+ * A flower rather than a heart, in the app's own terms: a win is something
+ * somebody grew, and this is the thing you leave on it.
+ *
+ * iOS wears the same glyph either way. `camera.macro` is the blossom SF Symbols
+ * has, and it has no filled twin — only a `.circle.fill`, which is a flower
+ * boxed in a disc and reads as a different control. So on iOS the fill is
+ * carried by weight and colour, which the button already changes.
+ */
 const LIKE_ICON = {
-  ios: 'heart',
-  android: 'favorite_border',
-  web: 'favorite_border',
+  ios: 'camera.macro',
+  android: 'filter_vintage',
+  web: 'filter_vintage',
 } as const;
 
 const LIKED_ICON = {
-  ios: 'heart.fill',
-  android: 'favorite',
-  web: 'favorite',
+  ios: 'camera.macro',
+  android: 'local_florist',
+  web: 'local_florist',
 } as const;
 
 /**
@@ -582,7 +592,7 @@ export function PostCard({
 
   // Which like request is the current one. Taps are cheap and people change
   // their mind fast, so rather than blocking a second tap until the first lands
-  // — which reads as a dropped press — every tap moves the heart immediately
+  // — which reads as a dropped press — every tap moves the flower immediately
   // and only the newest response is allowed to write back. An older reply
   // arriving late would otherwise undo the newer tap.
   const likeRequest = useRef(0);
@@ -782,7 +792,7 @@ export function PostCard({
             source={{ uri: author.avatar_url }}
             className="h-11 w-11 rounded-full"
             accessibilityLabel={`${displayName} profile photo`}>
-            <View className="h-11 w-11 items-center justify-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500">
+            <View className="h-11 w-11 items-center justify-center rounded-full bg-primary">
               <Text className="font-heading-bold text-base leading-6 text-white">
                 {(author.full_name.trim()[0] ?? '?').toUpperCase()}
               </Text>

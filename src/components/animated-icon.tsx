@@ -5,6 +5,8 @@ import { Dimensions, StyleSheet, View } from 'react-native';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { Brand } from '@/constants/theme';
+
 const INITIAL_SCALE_FACTOR = Dimensions.get('screen').height / 90;
 
 /**
@@ -16,22 +18,20 @@ const INITIAL_SCALE_FACTOR = Dimensions.get('screen').height / 90;
 const DURATION = 1100;
 
 /**
- * The brand sweep, as the splash wears it.
+ * The colour the splash wears.
  *
- * `experimental_backgroundImage` rather than a gradient library: the project
- * has no SVG or gradient dependency, and React Native takes CSS gradient syntax
- * directly. The angle runs down-right so the green starts at the top-left
- * corner the logo sits over.
+ * One flat green rather than the sweep it used to be: the palette carries the
+ * brand now, and a gradient over it only says the same thing twice.
  */
-const BRAND_SWEEP = 'linear-gradient(160deg, #22C55E 0%, #38BDF8 52%, #8B5CF6 100%)';
+const BRAND_GROUND = Brand.primary;
 
 /**
  * What covers the app while it boots, and how it gets out of the way.
  *
  * Two animations run together rather than one. The mark rushes toward the
- * viewer while the gradient behind it fades, so the splash reads as being
- * passed through rather than switched off — the welcome screen is already
- * mounted underneath and is simply uncovered.
+ * viewer while the colour behind it fades, so the splash reads as being passed
+ * through rather than switched off — the welcome screen is already mounted
+ * underneath and is simply uncovered.
  *
  * The static branch is what the native splash hands over to: same colour, same
  * mark, same size, so nothing jumps at the seam. Only once it has laid out is
@@ -44,7 +44,7 @@ export function AnimatedSplashOverlay() {
 
   if (!visible) return null;
 
-  // Held back until the gradient has had a moment on screen, then thrown at
+  // Held back until the colour has had a moment on screen, then thrown at
   // the viewer. The pause is what keeps it from looking like a glitch.
   const markKeyframe = new Keyframe({
     0: { transform: [{ scale: 1 }], opacity: 1 },
@@ -63,17 +63,17 @@ export function AnimatedSplashOverlay() {
   });
 
   // Fades late, so the mark is already moving before the colour goes.
-  const sweepKeyframe = new Keyframe({
+  const groundKeyframe = new Keyframe({
     0: { opacity: 1 },
     62: { opacity: 1 },
     100: { opacity: 0, easing: Easing.in(Easing.quad) },
   });
 
-  const mark = <Image style={styles.brandMark} source={require('@/assets/images/brand/logo.png')} />;
+  const mark = <Image style={styles.brandMark} source={require('@/assets/images/brand/welle_logo.png')} />;
 
   return animate ? (
     <Animated.View
-      entering={sweepKeyframe.duration(DURATION).withCallback((finished) => {
+      entering={groundKeyframe.duration(DURATION).withCallback((finished) => {
         'worklet';
         if (finished) {
           scheduleOnRN(setVisible, false);
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
   },
   background: {
     borderRadius: 40,
-    experimental_backgroundImage: `linear-gradient(180deg, #3C9FFE, #0274DF)`,
+    backgroundColor: Brand.accent,
     width: 128,
     height: 128,
     position: 'absolute',
@@ -184,17 +184,14 @@ const styles = StyleSheet.create({
   },
   brandOverlay: {
     ...StyleSheet.absoluteFill,
-    // The first colour of the sweep, so the frame before the gradient paints is
-    // the same green rather than a flash of white.
-    backgroundColor: '#22C55E',
-    experimental_backgroundImage: BRAND_SWEEP,
+    backgroundColor: BRAND_GROUND,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
   },
   splashOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#208AEF',
+    backgroundColor: Brand.accent,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,

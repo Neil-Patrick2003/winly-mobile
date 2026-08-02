@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PostCard } from '@/components/post-card';
 import { MenuButton, type MenuItem } from '@/components/ui/menu';
+import { Colors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -279,19 +280,20 @@ export default function CircleScreen() {
   const members = circle?.members_count ?? 0;
   const shared = circle?.posts_count;
 
-  const accent = circle?.color_hex ?? '#94A3B8';
+  // A circle always has a colour; this covers the frame before it has loaded,
+  // and is the palette's own muted green rather than a stray slate.
+  const accent = circle?.color_hex ?? Colors.light.textSecondary;
 
   const header = (
     <View>
       {/*
-        The circle's own colour as a banner, lightened towards the bottom so the
-        badge sitting on the seam stays legible. Its colour rather than one
-        fixed green: every circle already has one, and a screen that looked the
-        same for all of them would waste it.
+        The circle's own colour as a banner, flat — its colour rather than one
+        fixed green, because every circle already has one and a screen that
+        looked the same for all of them would waste it. The badge that straddles
+        the lower edge is opaque, so it stays legible without the wash of white
+        that used to be laid over the bottom of this.
       */}
-      <View style={{ height: insets.top + 132, backgroundColor: accent }}>
-        <View className="absolute inset-0 bg-linear-to-b from-white/0 to-white/45" />
-      </View>
+      <View style={{ height: insets.top + 132, backgroundColor: accent }} />
 
       {/* Pulled up over the banner's edge, so the badge straddles the seam. */}
       <View className="-mt-11 flex-row items-end justify-between px-6">

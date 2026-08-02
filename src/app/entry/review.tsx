@@ -245,7 +245,7 @@ export default function ReviewStepScreen() {
           accessibilityState={{ disabled: !canShare }}
           disabled={!canShare}
           onPress={share}
-          className={`mt-6 items-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500 py-4 active:opacity-85 ${
+          className={`mt-6 items-center rounded-full bg-primary py-4 active:opacity-85 ${
             canShare ? '' : 'opacity-40'
           }`}
           style={canShare ? { boxShadow: '0 8px 20px rgba(34, 197, 94, 0.35)' } : undefined}>

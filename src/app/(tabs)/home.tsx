@@ -23,7 +23,7 @@ import { WIN_KINDS, type WeekProgress } from '@/lib/progress';
 import { useWeekProgress } from '@/lib/use-week-progress';
 
 /** The green the home screen leans on: headings, buttons, the active tab. */
-const GREEN = '#5FBC88';
+const GREEN = Colors.light.primary;
 const STREAK_ORANGE = '#E28F43';
 
 /**
@@ -68,7 +68,7 @@ function Avatar({
       className={`rounded-full ${className}`}
       accessibilityLabel={`${name} profile photo`}>
       <View
-        className="items-center justify-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500"
+        className="items-center justify-center rounded-full bg-primary"
         style={{ width: size, height: size }}>
         <Text
           className="font-heading-bold text-white"
@@ -222,7 +222,7 @@ export default function HomeScreen() {
             size={56}
             className="h-14 w-14"
           />
-          <View className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-surface bg-[#4ADE80]" />
+          <View className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-surface bg-primary" />
         </View>
 
         <View className="flex-1">
@@ -248,7 +248,7 @@ export default function HomeScreen() {
 
       <StoryRail accent={GREEN} />
 
-      <View className="mx-4 mt-5 flex-row overflow-hidden rounded-3xl bg-linear-to-br from-[#EBF6EF] to-[#F1FAF2]">
+      <View className="mx-4 mt-5 flex-row overflow-hidden rounded-3xl bg-surface-selected">
         <View className="flex-1 gap-1.5 py-4 pl-4">
           <View>
             <Text className="font-heading-bold text-[18px] leading-6 text-ink">

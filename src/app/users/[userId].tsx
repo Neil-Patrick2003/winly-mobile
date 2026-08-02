@@ -127,8 +127,8 @@ function WinRow({ post }: { post: Post }) {
         <SymbolView
           name={
             post.viewer_has_liked
-              ? { ios: 'heart.fill', android: 'favorite', web: 'favorite' }
-              : { ios: 'heart', android: 'favorite_border', web: 'favorite_border' }
+              ? { ios: 'camera.macro', android: 'local_florist', web: 'local_florist' }
+              : { ios: 'camera.macro', android: 'filter_vintage', web: 'filter_vintage' }
           }
           size={15}
           tintColor={post.viewer_has_liked ? CORAL : Colors.light.textSecondary}
@@ -344,7 +344,7 @@ export default function UserProfileScreen() {
                 source={{ uri: profile.avatar_url }}
                 className="h-24 w-24 rounded-full"
                 accessibilityLabel={`${profile.full_name} profile photo`}>
-                <View className="h-24 w-24 items-center justify-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500">
+                <View className="h-24 w-24 items-center justify-center rounded-full bg-primary">
                   <Text className="font-heading-bold text-4xl leading-[44px] text-white">
                     {initial}
                   </Text>

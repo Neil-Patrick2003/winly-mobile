@@ -40,7 +40,7 @@ function Avatar({ uri, name }: { uri: string | null; name: string }) {
       size={AVATAR}
       accessibilityLabel={`${name} profile photo`}>
       <View
-        className="items-center justify-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500"
+        className="items-center justify-center rounded-full bg-primary"
         style={{ width: AVATAR, height: AVATAR }}>
         <Text className="font-heading-bold text-[15px] leading-5 text-white">
           {(name.trim()[0] ?? '?').toUpperCase()}

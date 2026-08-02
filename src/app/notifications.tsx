@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CircleBadge } from '@/components/circle-badge';
+import { Colors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -40,7 +41,7 @@ const KIND = {
     icon: { ios: 'person.fill.badge.plus', android: 'person_add', web: 'person_add' },
     tint: '#609BF1',
   },
-  like: { icon: { ios: 'heart.fill', android: 'favorite', web: 'favorite' }, tint: '#E5484D' },
+  like: { icon: { ios: 'camera.macro', android: 'local_florist', web: 'local_florist' }, tint: '#E5484D' },
   comment: {
     icon: { ios: 'bubble.right.fill', android: 'chat_bubble', web: 'chat_bubble' },
     tint: '#60BC88',
@@ -91,7 +92,7 @@ function NotificationRow({
           size={AVATAR}
           accessibilityLabel={`${item.actor?.full_name ?? 'Someone'} profile photo`}>
           <View
-            className="items-center justify-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500"
+            className="items-center justify-center rounded-full bg-primary"
             style={{ width: AVATAR, height: AVATAR }}>
             <Text className="font-heading-bold text-base leading-6 text-white">
               {(item.actor?.full_name.trim()[0] ?? '?').toUpperCase()}
@@ -325,7 +326,7 @@ export default function NotificationsScreen() {
                     <View className="flex-row items-center gap-3">
                       <CircleBadge
                         initial={item.circle?.icon_initial ?? '?'}
-                        color={item.circle?.color_hex ?? '#94A3B8'}
+                        color={item.circle?.color_hex ?? Colors.light.textSecondary}
                       />
                       <View className="flex-1">
                         <Text className="font-sans text-[15px] leading-[21px] text-ink">

@@ -116,7 +116,7 @@ export default function EditProfileScreen() {
     if (!permission.granted) {
       Alert.alert(
         'Photo access needed',
-        'Enable photo access for Winly in Settings to change your picture.'
+        'Enable photo access for Welle in Settings to change your picture.'
       );
       return;
     }
@@ -314,7 +314,7 @@ export default function EditProfileScreen() {
               source={{ uri: shownAvatar }}
               className="h-24 w-24 rounded-full"
               accessibilityLabel="Your profile photo">
-              <View className="h-24 w-24 items-center justify-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500">
+              <View className="h-24 w-24 items-center justify-center rounded-full bg-primary">
                 <Text className="font-heading-bold text-4xl leading-[44px] text-white">
                   {initial}
                 </Text>

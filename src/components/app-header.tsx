@@ -59,18 +59,20 @@ export function AppHeader() {
       <View className="w-full max-w-[800px] flex-row items-center justify-between self-center">
         <View className="flex-row items-center gap-2">
           <Image
-            source={require('@/assets/images/brand/logo.png')}
+            source={require('@/assets/images/brand/welle_logo.png')}
             className="h-11 w-11"
             contentFit="contain"
           />
-          {/* Plain text rather than <Wordmark />: that component's coral tittle
-              is positioned with offsets derived for 40px, so it cannot be
-              resized to header scale without redoing the geometry.
+          {/* Plain text rather than <Wordmark />, which is sized for the auth
+              screens: this is the same letters at header scale.
+
+              Lowercase, as the app icon sets the name — and in the brand green
+              rather than ink, so the mark reads as the mark.
 
               `font-logo-extrabold` is the real 800 face — `font-extrabold`
               would leave the 700 file in place and let Android fake the weight
               on top of it. */}
-          <Text className="font-logo-extrabold text-2xl leading-8 text-ink">Winly</Text>
+          <Text className="font-logo-extrabold text-2xl leading-8 text-primary">welle</Text>
         </View>
 
         {/* Settings sits on the Profile tab, and messages have gone for now —

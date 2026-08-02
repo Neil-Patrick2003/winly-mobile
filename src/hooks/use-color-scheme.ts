@@ -1,5 +1,5 @@
 /**
- * Winly is a light-only app. Every surface is designed against the light
+ * Welle is a light-only app. Every surface is designed against the light
  * palette — the welcome artwork and the Share flow's pillar accents are fixed
  * light-mode values — so this reports light regardless of the device setting,
  * rather than each screen pinning itself.

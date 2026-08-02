@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { HeartDivider } from '@/components/heart';
+import { LeafDivider } from '@/components/leaf';
 import { Field } from '@/components/ui/field';
 import { Wordmark } from '@/components/wordmark';
 import { Colors } from '@/constants/theme';
@@ -114,7 +114,7 @@ export default function LoginScreen() {
 
         <View className="items-center gap-2 pt-4">
           <Wordmark />
-          <HeartDivider />
+          <LeafDivider />
         </View>
 
         <View className="gap-1 pt-6">
@@ -199,7 +199,7 @@ export default function LoginScreen() {
             accessibilityState={{ disabled: !canSubmit }}
             disabled={!canSubmit}
             onPress={handleSubmit}
-            className={`items-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500 py-3.5 active:opacity-85 ${
+            className={`items-center rounded-full bg-primary py-3.5 active:opacity-85 ${
               canSubmit ? '' : 'opacity-40'
             }`}
             style={canSubmit ? { boxShadow: '0 8px 20px rgba(34, 197, 94, 0.35)' } : undefined}>
@@ -217,7 +217,7 @@ export default function LoginScreen() {
 
           <View className="flex-row items-center justify-center gap-1">
             <Text className="font-sans text-sm leading-5 text-ink-muted">
-              New to Winly?
+              New to Welle?
             </Text>
             {/* `replace`, so the two auth screens trade places instead of
                 stacking up each time you bounce between them. */}

@@ -97,7 +97,7 @@ export function SegmentedRing({
   segments,
   size = 56,
   thickness = 4,
-  track = '#EAEDF3',
+  track = '#E7EDE4',
   gap = 18,
   children,
 }: {

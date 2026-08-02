@@ -26,7 +26,7 @@ function Avatar({ uri, name, size }: { uri: string | null; name: string; size: n
         // Fills the placeholder rather than restating its size: the parent is
         // already exactly `size` square, and repeating the numbers here is a
         // second place to keep in step for no gain.
-        className="h-full w-full items-center justify-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500">
+        className="h-full w-full items-center justify-center rounded-full bg-primary">
         <Text
           className="font-heading-bold text-white"
           style={{ fontSize: size * 0.4, lineHeight: size * 0.5 }}>
@@ -62,7 +62,7 @@ function RingedAvatar({
   return (
     <View
       className={`rounded-full p-[2.5px] ${
-        seen ? 'bg-surface-selected' : 'bg-linear-to-tr from-green-400 via-sky-400 to-violet-400'
+        seen ? 'bg-surface-selected' : 'bg-primary'
       }`}>
       <View className="rounded-full bg-surface p-[2px]">
         <View style={{ width: BUBBLE, height: BUBBLE }}>

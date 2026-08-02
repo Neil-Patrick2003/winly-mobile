@@ -2,7 +2,7 @@ import { Link, Redirect } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { HeartDivider } from '@/components/heart';
+import { LeafDivider } from '@/components/leaf';
 import { Image } from '@/components/ui/image';
 import { Wordmark } from '@/components/wordmark';
 import { useAuth } from '@/lib/auth-context';
@@ -23,8 +23,8 @@ export default function WelcomeScreen() {
   return (
     <View className="flex-1 bg-surface">
       <Image
-        source={require('@/assets/images/illustrations/welcome_bg.png')}
-        className="absolute inset-0"
+        source={require('@/assets/images/illustrations/welcome_bg2.png')}
+        className="absolute inset-0 opacity-90"
         contentFit="cover"
         contentPosition="bottom center"
       />
@@ -34,50 +34,48 @@ export default function WelcomeScreen() {
         style={{ paddingTop: insets.top, paddingBottom: insets.bottom + 24 }}>
         <View className="items-center gap-2 pt-8">
           <Image
-            source={require('@/assets/images/brand/logo.png')}
+            source={require('@/assets/images/brand/welle_logo.png')}
             className="h-[120px] w-[148px]"
             contentFit="cover"
           />
           <Wordmark />
-          <HeartDivider />
           <Text className="text-center font-sans text-sm leading-6 text-ink-muted">
-            Your Feed for Personal Growth
+            True Wealth Starts Within.
           </Text>
-
-          <View className="flex-row">
-            <Text className="text-xl font-extrabold text-green-400">Share </Text>
-            <Text className="text-xl font-extrabold">your </Text>
-            <Text className="text-xl font-extrabold text-blue-400">Journey</Text>
-            <Text className="text-xl font-extrabold">.</Text>
-          </View>
-          <View className="flex-row">
-            <Text className="text-xl font-extrabold text-violet-400">Inspire </Text>
-            <Text className="text-xl font-extrabold">others.</Text>
-          </View>
-
+          <LeafDivider />
           <Text className="text-center font-sans text-sm leading-6 text-ink-muted">
-            Winly is a positive community where you can share your self-care, celebrate small wins,
+            Welle is a positive community where you can share your self-care, celebrate small wins,
             and grow together.
           </Text>
         </View>
 
+        {/* Both buttons sit over the dark foliage at the foot of the artwork,
+            which is what lets the outlined one be drawn in light at all — the
+            same pair over the pale sky above would be invisible.
+
+            Filled for the way in, outlined for the way back: the pairing the
+            rest of the app uses for a choice with one obvious answer. */}
         <View className="gap-2">
-          <Link href="/register" asChild>
+          <Link href="/login" asChild>
             <Pressable
               accessibilityRole="button"
-              className="items-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500 py-4 active:opacity-85"
-              style={{ boxShadow: '0 8px 20px rgba(34, 197, 94, 0.35)' }}>
-              <Text className="font-body-semibold text-base leading-6 text-white">Get started</Text>
+              className="items-center rounded-full bg-primary py-4 active:opacity-85">
+              <Text className="font-body-semibold text-base leading-6 text-primary-fg">
+                Login
+              </Text>
             </Pressable>
           </Link>
 
-          <Link href="/login" asChild>
-            <Pressable accessibilityRole="button" className="active:opacity-85">
-              <View className="rounded-full  p-[2px]">
-                <View className="items-center rounded-full bg-transparent px-8 py-4">
-                  <Text className="font-body-semibold text-base leading-6 text-gray-900">Log In</Text>
-                </View>
-              </View>
+          <Link href="/register" asChild>
+            <Pressable
+              accessibilityRole="button"
+              // `border-primary-fg` rather than a cream from Tailwind's own
+              // scale: the Forest palette has no amber, and this is the same
+              // white the filled button's label is set in.
+              className="items-center rounded-full border border-primary-fg py-4 active:opacity-85">
+              <Text className="font-body-semibold text-base leading-6 text-primary-fg">
+                Create an Account
+              </Text>
             </Pressable>
           </Link>
         </View>

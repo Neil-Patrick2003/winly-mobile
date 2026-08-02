@@ -183,7 +183,7 @@ function PersonRow({
         source={{ uri: person.avatar_url }}
         className="h-11 w-11 rounded-full"
         accessibilityLabel={`${person.full_name} profile photo`}>
-        <View className="h-11 w-11 items-center justify-center rounded-full bg-linear-to-r from-green-500 via-blue-500 to-violet-500">
+        <View className="h-11 w-11 items-center justify-center rounded-full bg-primary">
           <Text className="font-heading-bold text-base leading-6 text-white">
             {(person.full_name.trim()[0] ?? '?').toUpperCase()}
           </Text>
