@@ -136,8 +136,8 @@ function WinRow({ post }: { post: Post }) {
         <SymbolView
           name={
             post.viewer_has_liked
-              ? { ios: 'camera.macro', android: 'local_florist', web: 'local_florist' }
-              : { ios: 'camera.macro', android: 'filter_vintage', web: 'filter_vintage' }
+              ? { ios: 'heart.fill', android: 'favorite', web: 'favorite' }
+              : { ios: 'heart', android: 'favorite_border', web: 'favorite_border' }
           }
           size={15}
           tintColor={post.viewer_has_liked ? CORAL : Colors.light.textSecondary}

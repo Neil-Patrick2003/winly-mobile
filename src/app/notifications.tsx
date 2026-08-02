@@ -41,7 +41,7 @@ const KIND = {
     icon: { ios: 'person.fill.badge.plus', android: 'person_add', web: 'person_add' },
     tint: '#609BF1',
   },
-  like: { icon: { ios: 'camera.macro', android: 'local_florist', web: 'local_florist' }, tint: '#E5484D' },
+  like: { icon: { ios: 'heart.fill', android: 'favorite', web: 'favorite' }, tint: '#E5484D' },
   comment: {
     icon: { ios: 'bubble.right.fill', android: 'chat_bubble', web: 'chat_bubble' },
     tint: '#60BC88',
