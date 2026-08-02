@@ -7,7 +7,9 @@
     "icon": "./assets/images/brand/generated/welle-icon-1024.png",
     "scheme": "winly",
     "userInterfaceStyle": "automatic",
-    "ios": {},
+    "ios": {
+      "bundleIdentifier": "com.neilpatrick.winly"
+    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#073729",
@@ -16,7 +18,6 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.neilpatrick.winly",
       "permissions": [
-        "android.permission.RECORD_AUDIO",
         "android.permission.RECORD_AUDIO"
       ]
     },
