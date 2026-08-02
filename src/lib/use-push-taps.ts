@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
 
 import { useAuth } from '@/lib/auth-context';
 
@@ -42,6 +43,12 @@ function destinationFor(payload: PushPayload) {
  * Guarded on being signed in: every destination is behind auth, and pushing a
  * route before the session is restored would bounce straight back to sign-in
  * and lose where they were going.
+ *
+ * Native only. `expo-notifications` has no web implementation of either call —
+ * reading a response there throws "not available on web", which on the web
+ * build is a crash at startup rather than a missing feature, because this is
+ * mounted inside the root navigator. Nothing registers for push on web either
+ * (see `registerForPush`), so there is no tap here to answer.
  */
 export function usePushTaps() {
   const { isAuthenticated, isRestoring } = useAuth();
@@ -52,6 +59,7 @@ export function usePushTaps() {
   const handledLaunch = useRef(false);
 
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     if (isRestoring || !isAuthenticated) return;
 
     const open = (response: Notifications.NotificationResponse) => {

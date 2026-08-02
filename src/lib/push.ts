@@ -25,17 +25,24 @@ import { apiDelete, apiPost } from '@/lib/api';
  * then. Banners show in the foreground too: the websocket already updates the
  * bell, but the bell is a number in a corner and the point of this is to be
  * seen.
+ *
+ * Native only, and the guard has to be here rather than at the call sites:
+ * anything this module touches at load runs the moment it is imported, and on
+ * web `expo-notifications` answers its native methods with "not available on
+ * web" — which at module scope is a blank page rather than a missing feature.
  */
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    /** The strip across the top of the screen. */
-    shouldShowBanner: true,
-    /** And a row in the notification centre, so it can be found again. */
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      /** The strip across the top of the screen. */
+      shouldShowBanner: true,
+      /** And a row in the notification centre, so it can be found again. */
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+}
 
 /** What the backend records alongside the token. */
 type PushPlatform = 'ios' | 'android' | 'web';
@@ -84,18 +91,32 @@ async function ensureAndroidChannel() {
  */
 export async function registerForPush(authToken: string): Promise<string | null> {
   /*
+   * Every reason to stop is reported in development and silent in production.
+   *
+   * All of them are ordinary — a simulator, the web build, a refused prompt —
+   * and none is worth interrupting somebody over. But they are indistinguishable
+   * from the outside: the only symptom is that no notification ever arrives, and
+   * without this the answer to "why" is an empty `push_tokens` table and nothing
+   * else to go on.
+   */
+  const skip = (reason: string) => {
+    if (__DEV__) console.info(`[winly] Push not registered: ${reason}`);
+    return null;
+  };
+
+  /*
    * Simulators cannot receive a push, and asking would only teach somebody to
    * dismiss the permission prompt before they have ever seen why it is worth
    * granting. The prompt should come from a real device where it can pay off.
    */
-  if (!Device.isDevice) return null;
+  if (!Device.isDevice) return skip('not a physical device');
 
   // Web push needs a service worker and VAPID keys wired to the Expo project,
   // which this app has not set up — so it is skipped rather than half-asked.
-  if (Platform.OS === 'web') return null;
+  if (Platform.OS === 'web') return skip('web has no push set up');
 
   const id = projectId();
-  if (!id) return null;
+  if (!id) return skip('no EAS projectId in app config');
 
   try {
     await ensureAndroidChannel();
@@ -108,20 +129,24 @@ export async function registerForPush(authToken: string): Promise<string | null>
       existing.granted ||
       (await Notifications.requestPermissionsAsync()).granted;
 
-    if (!granted) return null;
+    if (!granted) return skip('permission was refused');
 
     const { data } = await Notifications.getExpoPushTokenAsync({ projectId: id });
 
     await apiPost('/api/v1/push-tokens', { token: data, platform: Platform.OS as PushPlatform }, authToken);
 
     return data;
-  } catch {
+  } catch (caught) {
     /*
      * Swallowed on purpose. This runs on sign-in, and a device that cannot be
      * registered — no credentials configured, no network, permission revoked
      * between the check and the mint — must not stop somebody using the app.
+     *
+     * The message is the useful part in development: "Cannot find native module
+     * 'ExpoPushTokenManager'" means the binary predates the package and needs
+     * rebuilding, which is not something an empty table would ever have said.
      */
-    return null;
+    return skip(caught instanceof Error ? caught.message : 'unknown error');
   }
 }
 
