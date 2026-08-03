@@ -21,7 +21,7 @@ const AUDIENCES: {
   {
     value: 'public',
     label: 'Public',
-    hint: 'Anyone on Winly',
+    hint: 'Anyone on Welle',
     icon: { ios: 'globe', android: 'public', web: 'public' },
   },
   {

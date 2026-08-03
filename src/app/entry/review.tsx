@@ -68,13 +68,10 @@ export default function ReviewStepScreen() {
     summaries.push({
       pillar: 'meditation',
       title: 'Meditation',
-      detail: `${formatDuration(meditation.minutes)}${
-        meditation.usedTimer
-          ? meditation.completed
-            ? ' · sat with the timer'
-            : ' · stopped early'
-          : ''
-      }`,
+      // The length is the whole of it. There used to be a note saying whether
+      // the in-app countdown was sat through or cut short; without the timer
+      // there is no such distinction to report.
+      detail: formatDuration(meditation.minutes),
       href: '/entry/meditation',
     });
   }

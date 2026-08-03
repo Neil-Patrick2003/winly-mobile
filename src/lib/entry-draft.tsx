@@ -36,12 +36,15 @@ import {
 export type MeditationDraft = {
   /** How long they sat, in whole minutes. */
   minutes: number | null;
-  /** They ran the in-app countdown rather than just logging a length. */
-  usedTimer: boolean;
   /**
-   * The full sit happened. Derived rather than declared: choosing a length says
-   * so, and opening the timer takes it back until the countdown reaches zero.
-   * False on a shared win is what reads as "stopped early".
+   * The sit happened. Derived rather than declared: choosing a length says so,
+   * and clearing it takes that back.
+   *
+   * There is no longer a way for this to be false with a length still chosen —
+   * the in-app countdown was what used to produce "stopped early", and the step
+   * now only logs sittings that have already happened. The field stays because
+   * the API still carries it, and a client that stopped sending it would be
+   * quietly deciding the question for every win.
    */
   completed: boolean;
 };
@@ -110,7 +113,7 @@ export type EntryDraft = {
 };
 
 const EMPTY: EntryDraft = {
-  meditation: { minutes: null, usedTimer: false, completed: false },
+  meditation: { minutes: null, completed: false },
   learning: { learned: '', reference: '', photos: [], completed: false },
   movement: { activity: null, otherActivity: '', photos: [], completed: false },
   caption: '',

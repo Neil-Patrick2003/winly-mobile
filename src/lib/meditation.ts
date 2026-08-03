@@ -16,8 +16,3 @@ export function formatDuration(minutes: number) {
   const hours = minutes / 60;
   return `${hours} hr${hours === 1 ? '' : 's'}`;
 }
-
-/** "9:05" — seconds remaining, as a countdown face. */
-export function formatClock(seconds: number) {
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-}
