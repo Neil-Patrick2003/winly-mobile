@@ -21,6 +21,7 @@ const AUDIENCES: {
   {
     value: 'public',
     label: 'Public',
+    // Replaced with the circle count where it is drawn, when there is one.
     hint: 'Anyone on Welle',
     icon: { ios: 'globe', android: 'public', web: 'public' },
   },
@@ -115,7 +116,15 @@ export function AudiencePicker({
               <Text className="mt-0.5 font-sans text-[12px] leading-4 text-ink-muted">
                 {audience.value === 'all_circles'
                   ? `Members of your ${circles.length} circle${circles.length === 1 ? '' : 's'}`
-                  : audience.hint}
+                  : /*
+                     * Public is the widest of the three: it reaches everybody
+                     * *and* still lands in your own circles. Said plainly here,
+                     * because "public" on its own reads as though it were being
+                     * shared past your groups rather than beyond them.
+                     */
+                    audience.value === 'public' && circles.length > 0
+                    ? 'Anyone on Welle, and all your circles'
+                    : audience.hint}
               </Text>
             </View>
 
