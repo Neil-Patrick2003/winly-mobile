@@ -63,10 +63,11 @@ export default function RegisterScreen() {
   // addresses that are actually valid; the real check is the confirmation mail.
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const emailInvalid = email.trim().length > 0 && !emailValid;
-  const longEnough = password.length >= MIN_PASSWORD_LENGTH;
-  // Anything that is not a letter counts: digits, punctuation, symbols.
-  const hasNumberOrSymbol = /[^A-Za-z]/.test(password);
-  const passwordValid = longEnough && hasNumberOrSymbol;
+  // A length, and nothing else — the same rule the server keeps. There was a
+  // second clause here demanding a number or symbol, which the server never
+  // asked for in development and asked far more of in production; the two
+  // disagreeing is what made the note below wrong wherever you happened to be.
+  const passwordValid = password.length >= MIN_PASSWORD_LENGTH;
   const passwordInvalid = password.length > 0 && !passwordValid;
   const mismatch = confirmPassword.length > 0 && confirmPassword !== password;
 
@@ -92,11 +93,9 @@ export default function RegisterScreen() {
         ? 'Enter a valid email address.'
         : mismatch
           ? 'Passwords do not match.'
-          : password.length > 0 && !longEnough
+          : passwordInvalid
             ? `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`
-            : longEnough && !hasNumberOrSymbol
-              ? 'Add a number or special character.'
-              : null);
+            : null);
 
   /** Drop the server's complaint about a field as soon as it is edited. */
   const edit = (field: string, setValue: (value: string) => void) => (value: string) => {
@@ -257,15 +256,37 @@ export default function RegisterScreen() {
             <Text className="px-4 font-sans text-xs leading-4 text-highlight">{error}</Text>
           ) : null}
         </View>
-        <View className="mt-2 flex-row items-start gap-2 rounded-lg bg-green-100 p-4">
+        {/* The standing rule, and then the answer to it.
+            Saying "at least 8 characters" and nothing more leaves somebody
+            counting their own typing to find out whether they are done. Once
+            the password clears the bar this says so outright, which is the
+            only moment the note has anything new to add. */}
+        <View
+          accessibilityRole="text"
+          accessibilityLabel={
+            passwordValid
+              ? 'Password is long enough'
+              : `Password must be at least ${MIN_PASSWORD_LENGTH} characters`
+          }
+          className={`mt-2 flex-row items-start gap-2 rounded-lg p-4 ${
+            passwordValid ? 'bg-green-100' : 'bg-surface-card'
+          }`}>
           <SymbolView
-            name={{ ios: 'checkmark.shield', android: 'shield', web: 'shield' }}
+            name={
+              passwordValid
+                ? { ios: 'checkmark.circle.fill', android: 'check_circle', web: 'check_circle' }
+                : { ios: 'checkmark.shield', android: 'shield', web: 'shield' }
+            }
             size={16}
-            tintColor={Colors.light.textSecondary}
+            tintColor={passwordValid ? Colors.light.primary : Colors.light.textSecondary}
           />
-          <Text className="flex-1 text-gray-400">
-            Password must be at least {MIN_PASSWORD_LENGTH} characters and include a number or
-            special character
+          <Text
+            className={`flex-1 font-sans text-[13px] leading-[18px] ${
+              passwordValid ? 'text-ink' : 'text-ink-muted'
+            }`}>
+            {passwordValid
+              ? 'That password will do nicely.'
+              : `Password must be at least ${MIN_PASSWORD_LENGTH} characters`}
           </Text>
         </View>
 
