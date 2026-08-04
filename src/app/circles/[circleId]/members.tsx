@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -10,6 +10,7 @@ import {
   Pressable,
   Text,
   View,
+  type AlertButton,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -196,32 +197,60 @@ export default function CircleMembersScreen() {
     [act]
   );
 
-  /** The owner's actions for one member. */
+  const canManage = circle?.is_owner ?? false;
+
+  /**
+   * What can be done about one member.
+   *
+   * Opening a profile is the one thing anybody may do, so the menu is no
+   * longer the owner's alone — it used to appear only for them, which left
+   * every other reader tapping a row that did nothing at all. Removing and
+   * blocking stay where they were.
+   */
   const openMenu = useCallback(
     (member: CircleMember) => {
+      const viewProfile = () =>
+        router.push({ pathname: '/users/[userId]', params: { userId: member.id } });
+
+      // The owner cannot be turned out of their own circle, and the server
+      // refuses it — so those two are offered only where they would work.
+      const governs = canManage && !member.is_owner;
+
       if (Platform.OS === 'ios') {
+        const options = governs
+          ? ['Cancel', 'View profile', 'Remove from circle', 'Block']
+          : ['Cancel', 'View profile'];
+
         ActionSheetIOS.showActionSheetWithOptions(
           {
             title: member.full_name,
-            options: ['Cancel', 'Remove from circle', 'Block'],
-            destructiveButtonIndex: 2,
+            options,
+            destructiveButtonIndex: governs ? 3 : undefined,
             cancelButtonIndex: 0,
           },
           (index) => {
-            if (index === 1) confirm(member, 'remove');
-            if (index === 2) confirm(member, 'block');
+            if (index === 1) viewProfile();
+            if (governs && index === 2) confirm(member, 'remove');
+            if (governs && index === 3) confirm(member, 'block');
           }
         );
         return;
       }
 
-      Alert.alert(member.full_name, undefined, [
-        { text: 'Remove from circle', onPress: () => confirm(member, 'remove') },
-        { text: 'Block', style: 'destructive', onPress: () => confirm(member, 'block') },
-        { text: 'Cancel', style: 'cancel' },
-      ]);
+      const buttons: AlertButton[] = [{ text: 'View profile', onPress: viewProfile }];
+
+      if (governs) {
+        buttons.push(
+          { text: 'Remove from circle', onPress: () => confirm(member, 'remove') },
+          { text: 'Block', style: 'destructive', onPress: () => confirm(member, 'block') }
+        );
+      }
+
+      buttons.push({ text: 'Cancel', style: 'cancel' });
+
+      Alert.alert(member.full_name, undefined, buttons);
     },
-    [confirm]
+    [canManage, confirm]
   );
 
   const unblock = useCallback(
@@ -243,8 +272,6 @@ export default function CircleMembersScreen() {
     },
     [token, circleId]
   );
-
-  const canManage = circle?.is_owner ?? false;
 
   return (
     <View className="flex-1 bg-surface">
@@ -301,15 +328,23 @@ export default function CircleMembersScreen() {
                 </Text>
               </View>
 
-              {/* Nothing to do to yourself, and the owner cannot be turned out
-                  of their own circle — the server refuses both. */}
-              {canManage && !item.is_owner && item.id !== user?.id ? (
+              {/* Shown against everybody but yourself: opening a profile is
+                  something any reader may do, and there is nothing useful to
+                  offer about your own row. What the menu holds beyond that
+                  depends on who is asking — see `openMenu`. */}
+              {item.id !== user?.id ? (
                 busyId === item.id ? (
                   <ActivityIndicator size="small" color={theme.textSecondary} />
                 ) : (
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`Manage ${item.full_name}`}
+                    // Says what the menu actually holds. "Manage" was true
+                    // while the owner was the only one who saw it.
+                    accessibilityLabel={
+                      canManage && !item.is_owner
+                        ? `Manage ${item.full_name}`
+                        : `Options for ${item.full_name}`
+                    }
                     onPress={() => openMenu(item)}
                     hitSlop={8}
                     className="p-2 active:opacity-60">
