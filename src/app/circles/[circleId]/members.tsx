@@ -1,20 +1,11 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActionSheetIOS,
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Platform,
-  Pressable,
-  Text,
-  View,
-  type AlertButton,
-} from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ImageWithPlaceholder } from '@/components/ui/image';
+import { MenuButton, type MenuItem } from '@/components/ui/menu';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -29,7 +20,9 @@ import {
 } from '@/lib/circles';
 import type { UserSummary } from '@/lib/stories';
 import { timeAgo } from '@/lib/time';
+import { useConfirm } from '@/lib/confirm';
 import { goBack } from '@/lib/navigation';
+import { useToast } from '@/lib/toast';
 
 const AVATAR = 40;
 
@@ -62,6 +55,8 @@ export default function CircleMembersScreen() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const { token, user } = useAuth();
+  const confirm = useConfirm();
+  const showToast = useToast();
 
   const [circle, setCircle] = useState<Circle | null>(null);
   const [members, setMembers] = useState<CircleMember[]>([]);
@@ -164,37 +159,30 @@ export default function CircleMembersScreen() {
             : previous
         );
       } catch (caught) {
-        Alert.alert(
-          'That did not work',
-          caught instanceof Error ? caught.message : 'Please try again.'
-        );
+        showToast(caught instanceof Error ? caught.message : 'That did not work.');
       } finally {
         setBusyId(null);
       }
     },
-    [token, circleId]
+    [token, circleId, showToast]
   );
 
-  const confirm = useCallback(
-    (member: CircleMember, action: 'remove' | 'block') => {
+  const ask = useCallback(
+    async (member: CircleMember, action: 'remove' | 'block') => {
       const removing = action === 'remove';
 
-      Alert.alert(
-        removing ? `Remove ${member.full_name}?` : `Block ${member.full_name}?`,
-        removing
+      const confirmed = await confirm({
+        title: removing ? `Remove ${member.full_name}?` : `Block ${member.full_name}?`,
+        message: removing
           ? 'They can join again if they want to.'
           : 'They are removed and cannot rejoin or be invited back.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: removing ? 'Remove' : 'Block',
-            style: 'destructive',
-            onPress: () => void act(member, action),
-          },
-        ]
-      );
+        confirmLabel: removing ? 'Remove' : 'Block',
+        destructive: true,
+      });
+
+      if (confirmed) await act(member, action);
     },
-    [act]
+    [act, confirm]
   );
 
   const canManage = circle?.is_owner ?? false;
@@ -202,55 +190,42 @@ export default function CircleMembersScreen() {
   /**
    * What can be done about one member.
    *
-   * Opening a profile is the one thing anybody may do, so the menu is no
-   * longer the owner's alone — it used to appear only for them, which left
-   * every other reader tapping a row that did nothing at all. Removing and
-   * blocking stay where they were.
+   * Opening a profile is the one thing anybody may do, so the menu is not the
+   * owner's alone — it used to appear only for them, which left every other
+   * reader with a row that did nothing. Removing and blocking are still theirs.
    */
-  const openMenu = useCallback(
-    (member: CircleMember) => {
-      const viewProfile = () =>
-        router.push({ pathname: '/users/[userId]', params: { userId: member.id } });
+  const menuFor = useCallback(
+    (member: CircleMember): MenuItem[] => {
+      const items: MenuItem[] = [
+        {
+          label: 'View profile',
+          icon: { ios: 'person', android: 'person', web: 'person' },
+          onPress: () =>
+            router.push({ pathname: '/users/[userId]', params: { userId: member.id } }),
+        },
+      ];
 
       // The owner cannot be turned out of their own circle, and the server
       // refuses it — so those two are offered only where they would work.
-      const governs = canManage && !member.is_owner;
-
-      if (Platform.OS === 'ios') {
-        const options = governs
-          ? ['Cancel', 'View profile', 'Remove from circle', 'Block']
-          : ['Cancel', 'View profile'];
-
-        ActionSheetIOS.showActionSheetWithOptions(
+      if (canManage && !member.is_owner) {
+        items.push(
           {
-            title: member.full_name,
-            options,
-            destructiveButtonIndex: governs ? 3 : undefined,
-            cancelButtonIndex: 0,
+            label: 'Remove from circle',
+            icon: { ios: 'person.badge.minus', android: 'person_remove', web: 'person_remove' },
+            onPress: () => void ask(member, 'remove'),
           },
-          (index) => {
-            if (index === 1) viewProfile();
-            if (governs && index === 2) confirm(member, 'remove');
-            if (governs && index === 3) confirm(member, 'block');
+          {
+            label: 'Block',
+            icon: { ios: 'hand.raised', android: 'block', web: 'block' },
+            destructive: true,
+            onPress: () => void ask(member, 'block'),
           }
         );
-        return;
       }
 
-      const buttons: AlertButton[] = [{ text: 'View profile', onPress: viewProfile }];
-
-      if (governs) {
-        buttons.push(
-          { text: 'Remove from circle', onPress: () => confirm(member, 'remove') },
-          { text: 'Block', style: 'destructive', onPress: () => confirm(member, 'block') }
-        );
-      }
-
-      buttons.push({ text: 'Cancel', style: 'cancel' });
-
-      Alert.alert(member.full_name, undefined, buttons);
+      return items;
     },
-    [canManage, confirm]
+    [ask, canManage]
   );
 
   const unblock = useCallback(
@@ -262,15 +237,12 @@ export default function CircleMembersScreen() {
         await unblockMember(circleId, person.id, token);
         setBlocked((previous) => previous.filter((row) => row.id !== person.id));
       } catch (caught) {
-        Alert.alert(
-          'That did not work',
-          caught instanceof Error ? caught.message : 'Please try again.'
-        );
+        showToast(caught instanceof Error ? caught.message : 'That did not work.');
       } finally {
         setBusyId(null);
       }
     },
-    [token, circleId]
+    [token, circleId, showToast]
   );
 
   return (
@@ -331,13 +303,13 @@ export default function CircleMembersScreen() {
               {/* Shown against everybody but yourself: opening a profile is
                   something any reader may do, and there is nothing useful to
                   offer about your own row. What the menu holds beyond that
-                  depends on who is asking — see `openMenu`. */}
+                  depends on who is asking — see `menuFor`. */}
               {item.id !== user?.id ? (
                 busyId === item.id ? (
                   <ActivityIndicator size="small" color={theme.textSecondary} />
                 ) : (
-                  <Pressable
-                    accessibilityRole="button"
+                  <MenuButton
+                    items={menuFor(item)}
                     // Says what the menu actually holds. "Manage" was true
                     // while the owner was the only one who saw it.
                     accessibilityLabel={
@@ -345,15 +317,9 @@ export default function CircleMembersScreen() {
                         ? `Manage ${item.full_name}`
                         : `Options for ${item.full_name}`
                     }
-                    onPress={() => openMenu(item)}
-                    hitSlop={8}
-                    className="p-2 active:opacity-60">
-                    <SymbolView
-                      name={{ ios: 'ellipsis', android: 'more_horiz', web: 'more_horiz' }}
-                      size={16}
-                      tintColor={theme.textSecondary}
-                    />
-                  </Pressable>
+                    tintColor={theme.textSecondary}
+                    className="p-2 active:opacity-60"
+                  />
                 )
               ) : null}
             </View>
