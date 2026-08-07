@@ -519,13 +519,37 @@ export default function CircleScreen() {
           </Text>
         </Pressable>
 
-        {circle?.tag ? (
-          <View
-            className="mt-3 self-start rounded-full px-3.5 py-2"
-            style={{ backgroundColor: `${accent}1F` }}>
-            <Text className="font-body-semibold text-[13px] leading-[18px]" style={{ color: accent }}>
-              {circle.tag}
-            </Text>
+        {circle && (circle.tag || circle.is_private) ? (
+          <View className="mt-3 flex-row flex-wrap items-center gap-2">
+            {circle.tag ? (
+              <View
+                className="rounded-full px-3.5 py-2"
+                style={{ backgroundColor: `${accent}1F` }}>
+                <Text
+                  className="font-body-semibold text-[13px] leading-[18px]"
+                  style={{ color: accent }}>
+                  {circle.tag}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Said on the circle's own screen and nowhere louder: the people
+                inside should know the room they are in is a closed one, and the
+                owner should be able to see the setting took without opening the
+                form again. Muted rather than accented — it is a fact about the
+                circle, not a badge it has earned. */}
+            {circle.is_private ? (
+              <View className="flex-row items-center gap-1.5 rounded-full border border-hairline px-3.5 py-2">
+                <SymbolView
+                  name={{ ios: 'lock', android: 'lock', web: 'lock' }}
+                  size={12}
+                  tintColor={theme.textSecondary}
+                />
+                <Text className="font-body-semibold text-[13px] leading-[18px] text-ink-muted">
+                  Private
+                </Text>
+              </View>
+            ) : null}
           </View>
         ) : null}
 

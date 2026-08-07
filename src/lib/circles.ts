@@ -17,6 +17,13 @@ export type Circle = {
   /** `#946FF0` — picked from the name, so it never appears to change. */
   color_hex: string;
   tag: string | null;
+  /**
+   * Whether it is kept out of Discover and out of search.
+   *
+   * About being found rather than being read: the ways into a private circle
+   * are an invitation and a link from somebody already inside. Everything made
+   * before the choice existed is public, which is what the forms default to.
+   */
   is_private: boolean;
   /**
    * The circle this one sits inside, or null when it stands on its own.
@@ -86,21 +93,25 @@ export function fetchCircles(token: string, cursor?: string, perPage = CIRCLES_P
 /**
  * POST /api/v1/circles — start one.
  *
- * Public only for now. The server refuses a private one outright rather than
- * quietly making it public, so a client is never told it made something it did
- * not.
+ * Public unless `isPrivate` says otherwise. A private circle is kept out of
+ * Discover and out of search, so the only ways in are an invitation and a link
+ * from somebody already inside.
  */
 export async function createCircle(
-  fields: { name: string; description?: string; tag?: string },
+  fields: { name: string; description?: string; tag?: string; isPrivate?: boolean },
   token: string
 ) {
-  const body: Record<string, string> = { name: fields.name.trim() };
+  const body: Record<string, string | boolean> = { name: fields.name.trim() };
 
   const description = fields.description?.trim();
   if (description) body.description = description;
 
   const tag = fields.tag?.trim();
   if (tag) body.tag = tag;
+
+  // Sent either way rather than only when true: this is the one field where the
+  // form has an answer even when nobody touched it.
+  body.is_private = fields.isPrivate ?? false;
 
   const response = await apiPost<{ data: Circle }>('/api/v1/circles', body, token);
 
@@ -116,16 +127,27 @@ export async function createCircle(
  *
  * The badge letter follows a rename server-side. The colour does not: it is how
  * the circle is picked out of a list, and it stays the one people know.
+ *
+ * `isPrivate` follows the same rule as the rest: leaving it out keeps the
+ * circle as it is. Turning one private hides it from Discover and search
+ * without turning anybody out — the people inside were let in, and what is on
+ * the wall was shared with them.
  */
 export async function updateCircle(
   circleId: string,
-  fields: { name: string; description?: string | null; tag?: string | null },
+  fields: {
+    name: string;
+    description?: string | null;
+    tag?: string | null;
+    isPrivate?: boolean;
+  },
   token: string
 ) {
-  const body: Record<string, string | null> = { name: fields.name.trim() };
+  const body: Record<string, string | boolean | null> = { name: fields.name.trim() };
 
   if (fields.description !== undefined) body.description = fields.description?.trim() || null;
   if (fields.tag !== undefined) body.tag = fields.tag?.trim() || null;
+  if (fields.isPrivate !== undefined) body.is_private = fields.isPrivate;
 
   const response = await apiPatch<{ data: Circle }>(
     `/api/v1/circles/${circleId}`,

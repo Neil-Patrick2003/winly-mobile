@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useResolveClassNames } from 'uniwind';
 
+import { CircleVisibilityPicker } from '@/components/circle-visibility-picker';
 import { useKeyboardVisible } from '@/hooks/use-keyboard-visible';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api';
@@ -43,8 +44,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
  * owner's manage page — it decides who ends up able to read a group's wins, and
  * that is a decision to make sitting down rather than on a phone.
  *
- * There is nothing to choose about who can see it: every circle is open, and a
- * control offering otherwise would describe a feature that does not exist.
+ * Public unless said otherwise, which is what the picker starts on: most
+ * circles want to be found, and a private one is the deliberate choice.
  */
 export default function NewCircleScreen() {
   const insets = useSafeAreaInsets();
@@ -57,6 +58,7 @@ export default function NewCircleScreen() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [tag, setTag] = useState('');
+  const [isPrivate, setIsPrivate] = useState(false);
   const [saving, setSaving] = useState(false);
   // Keyed by the API's field name, so a 422 lands under the box at fault.
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -69,9 +71,9 @@ export default function NewCircleScreen() {
     setSaving(true);
     setFieldErrors({});
     try {
-      const circle = await createCircle({ name, description, tag }, token);
+      const circle = await createCircle({ name, description, tag, isPrivate }, token);
 
-      showToast('Circle started 🌱');
+      showToast(isPrivate ? 'Private circle started 🌱' : 'Circle started 🌱');
       // Replaced rather than pushed onto: going back from the new circle should
       // land on the list, not on the form that made it.
       router.replace({ pathname: '/circles/[circleId]', params: { circleId: circle.id } });
@@ -165,6 +167,12 @@ export default function NewCircleScreen() {
             className="mt-2 rounded-2xl border border-hairline bg-surface-card px-4 py-3 font-sans text-[15px] leading-[22px] text-ink"
           />
         </Field>
+
+        <CircleVisibilityPicker
+          isPrivate={isPrivate}
+          onChange={setIsPrivate}
+          disabled={saving}
+        />
       </ScrollView>
 
       <View

@@ -19,7 +19,7 @@ function CircleRow({ circle }: { circle: Circle }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${circleLabel(circle)}, ${members} ${members === 1 ? 'member' : 'members'}`}
+      accessibilityLabel={`${circleLabel(circle)}${circle.is_private ? ', private' : ''}, ${members} ${members === 1 ? 'member' : 'members'}`}
       onPress={() =>
         router.push({ pathname: '/circles/[circleId]', params: { circleId: circle.id } })
       }
@@ -33,6 +33,16 @@ function CircleRow({ circle }: { circle: Circle }) {
             numberOfLines={1}
             className="font-body-semibold text-base leading-6 text-ink"
           />
+          {/* A glyph rather than a pill: this list is mostly your own circles,
+              and "Private" spelled out beside every one of them would crowd out
+              the names it sits next to. */}
+          {circle.is_private ? (
+            <SymbolView
+              name={{ ios: 'lock.fill', android: 'lock', web: 'lock' }}
+              size={11}
+              tintColor={Colors.light.textSecondary}
+            />
+          ) : null}
           {/* The one thing that separates a circle you made from one you
               joined — they arrive in the same list. */}
           {circle.is_owner ? (

@@ -14,11 +14,14 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useResolveClassNames } from 'uniwind';
 
+import { circleLabel } from '@/components/circle-name';
+import { CircleVisibilityPicker } from '@/components/circle-visibility-picker';
 import { useKeyboardVisible } from '@/hooks/use-keyboard-visible';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { fetchCircle, updateCircle, type Circle } from '@/lib/circles';
+import { useConfirm } from '@/lib/confirm';
 import { useToast } from '@/lib/toast';
 import { goBack } from '@/lib/navigation';
 
@@ -40,12 +43,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
  * Change a circle you own.
  *
  * The create form again, filled in — a circle is corrected in the boxes it was
- * written in, and a differently worded screen for the same three fields would
- * read as a different kind of thing.
+ * written in, and a differently worded screen for the same fields would read as
+ * a different kind of thing.
  *
  * What is not here: the colour, which is the circle as people pick it out of a
- * list, and who can see it, which is a feature that does not exist yet. The
- * badge letter follows the name server-side, so it is not asked for either.
+ * list. The badge letter follows the name server-side, so it is not asked for
+ * either.
  */
 export default function EditCircleScreen() {
   const { circleId } = useLocalSearchParams<{ circleId: string }>();
@@ -55,11 +58,13 @@ export default function EditCircleScreen() {
   const keyboardVisible = useKeyboardVisible();
   const { token } = useAuth();
   const showToast = useToast();
+  const confirm = useConfirm();
 
   const [circle, setCircle] = useState<Circle | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [tag, setTag] = useState('');
+  const [isPrivate, setIsPrivate] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   // Keyed by the API's field name, so a 422 lands under the box at fault.
@@ -78,6 +83,7 @@ export default function EditCircleScreen() {
         setName(found.name);
         setDescription(found.description ?? '');
         setTag(found.tag ?? '');
+        setIsPrivate(found.is_private);
       } catch (caught) {
         if (!cancelled) {
           setLoadError(
@@ -97,6 +103,25 @@ export default function EditCircleScreen() {
   const save = async () => {
     if (!token || !circle || !canSave) return;
 
+    /*
+     * Asked only on the way out into the open, as unfollowing is.
+     *
+     * Going private is a step back nobody regrets. Going public puts a group
+     * that has been talking among itself in front of everybody, and every win
+     * already on its wall goes with it — which is the sort of thing to be sure
+     * of before it is done rather than sorry about after.
+     */
+    if (circle.is_private && !isPrivate) {
+      const confirmed = await confirm({
+        title: `Make ${circleLabel(circle)} public?`,
+        message:
+          'Anyone will be able to find it in Discover and join, and everything already shared into it comes with it.',
+        confirmLabel: 'Make public',
+        destructive: true,
+      });
+      if (!confirmed) return;
+    }
+
     setSaving(true);
     setFieldErrors({});
     try {
@@ -108,9 +133,17 @@ export default function EditCircleScreen() {
        * straight back. `updateCircle` sends an emptied box as an explicit null,
        * which is how the server is told to drop it.
        */
-      await updateCircle(circle.id, { name, description, tag }, token);
+      await updateCircle(circle.id, { name, description, tag, isPrivate }, token);
 
-      showToast('Circle updated');
+      // Named out loud when it moved: a circle changing who can find it is
+      // worth more than the same "Circle updated" a fixed typo gets.
+      showToast(
+        isPrivate === circle.is_private
+          ? 'Circle updated'
+          : isPrivate
+            ? 'Circle is private now'
+            : 'Circle is public now'
+      );
       goBack({ pathname: '/circles/[circleId]', params: { circleId: circle.id } });
     } catch (caught) {
       setSaving(false);
@@ -227,6 +260,12 @@ export default function EditCircleScreen() {
                 </Text>
               ) : null}
             </Field>
+
+            <CircleVisibilityPicker
+              isPrivate={isPrivate}
+              onChange={setIsPrivate}
+              disabled={saving}
+            />
           </ScrollView>
 
           <View
