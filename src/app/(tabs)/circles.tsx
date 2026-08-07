@@ -5,6 +5,7 @@ import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } fr
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CircleBadge } from '@/components/circle-badge';
+import { CircleName, circleLabel } from '@/components/circle-name';
 import { BottomTabInset, Colors } from '@/constants/theme';
 import { useAuth } from '@/lib/auth-context';
 import { fetchCircles, type Circle } from '@/lib/circles';
@@ -18,7 +19,7 @@ function CircleRow({ circle }: { circle: Circle }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${circle.name}, ${members} ${members === 1 ? 'member' : 'members'}`}
+      accessibilityLabel={`${circleLabel(circle)}, ${members} ${members === 1 ? 'member' : 'members'}`}
       onPress={() =>
         router.push({ pathname: '/circles/[circleId]', params: { circleId: circle.id } })
       }
@@ -27,9 +28,11 @@ function CircleRow({ circle }: { circle: Circle }) {
 
       <View className="flex-1">
         <View className="flex-row items-center gap-2">
-          <Text numberOfLines={1} className="font-body-semibold text-base leading-6 text-ink">
-            {circle.name}
-          </Text>
+          <CircleName
+            circle={circle}
+            numberOfLines={1}
+            className="font-body-semibold text-base leading-6 text-ink"
+          />
           {/* The one thing that separates a circle you made from one you
               joined — they arrive in the same list. */}
           {circle.is_owner ? (

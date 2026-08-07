@@ -9,6 +9,7 @@ import { MenuButton, type MenuItem } from '@/components/ui/menu';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
 import {
+  assignCircleOwner,
   blockMember,
   fetchBlockedMembers,
   fetchCircle,
@@ -186,6 +187,44 @@ export default function CircleMembersScreen() {
   );
 
   const canManage = circle?.is_owner ?? false;
+  /**
+   * Whether this screen can hand the circle to somebody.
+   *
+   * Only a circle inside another has an owner to reassign — one standing on
+   * its own answers
+   * to nobody above it, so there is nobody with standing to give it away. The
+   * server refuses either way; this only decides whether to offer it.
+   */
+  const canHandOver = canManage && (circle?.is_sub_circle ?? false);
+
+  const handOver = useCallback(
+    async (member: CircleMember) => {
+      if (!token || !circleId) return;
+
+      const confirmed = await confirm({
+        title: `Make ${member.full_name} the owner?`,
+        message: 'They will keep this circle. You can take it back at any time.',
+        confirmLabel: 'Hand over',
+      });
+
+      if (!confirmed) return;
+
+      setBusyId(member.id);
+      try {
+        const updated = await assignCircleOwner(circleId, member.id, token);
+        setCircle(updated);
+        // Reloaded rather than patched by hand: which row wears the Owner badge
+        // has moved, and that is a fact about the list rather than one row.
+        await loadMembers(true);
+        showToast(`${member.full_name} keeps this circle now`);
+      } catch (caught) {
+        showToast(caught instanceof Error ? caught.message : 'That did not work.');
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [token, circleId, confirm, loadMembers, showToast]
+  );
 
   /**
    * What can be done about one member.
@@ -207,6 +246,16 @@ export default function CircleMembersScreen() {
 
       // The owner cannot be turned out of their own circle, and the server
       // refuses it — so those two are offered only where they would work.
+      // Handing it over comes before the two that take something away: it is
+      // the ordinary thing to do with a circle you opened, and they are not.
+      if (canHandOver && !member.is_owner) {
+        items.push({
+          label: 'Make owner of this circle',
+          icon: { ios: 'crown', android: 'workspace_premium', web: 'workspace_premium' },
+          onPress: () => void handOver(member),
+        });
+      }
+
       if (canManage && !member.is_owner) {
         items.push(
           {
@@ -225,7 +274,7 @@ export default function CircleMembersScreen() {
 
       return items;
     },
-    [ask, canManage]
+    [ask, canManage, canHandOver, handOver]
   );
 
   const unblock = useCallback(

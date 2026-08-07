@@ -13,6 +13,7 @@ import {
 
 import { PILLAR_THEME } from '@/components/entry-chrome';
 import { ImageWithPlaceholder } from '@/components/ui/image';
+import { CircleName, circleLabel } from '@/components/circle-name';
 import { MenuButton, type MenuItem } from '@/components/ui/menu';
 import { Colors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -830,8 +831,8 @@ export function PostCard({
                   accessibilityRole="button"
                   accessibilityLabel={
                     circles.length === 1
-                      ? `Shared in ${circles[0].name}. Open circle.`
-                      : `Shared in ${circles[0].name} and ${circles.length - 1} more. Open circle.`
+                      ? `Shared in ${circleLabel(circles[0])}. Open circle.`
+                      : `Shared in ${circleLabel(circles[0])} and ${circles.length - 1} more. Open circle.`
                   }
                   onPress={() =>
                     router.push({
@@ -848,11 +849,13 @@ export function PostCard({
                       {(circles[0].icon_initial.trim()[0] ?? '?').toUpperCase()}
                     </Text>
                   </View>
-                  <Text
+                  {/* Already muted, so the parent needs no second dimming. */}
+                  <CircleName
+                    circle={circles[0]}
                     numberOfLines={1}
-                    className="shrink font-body-semibold text-[13px] leading-[18px] text-ink-muted">
-                    {circles[0].name}
-                  </Text>
+                    className="shrink font-body-semibold text-[13px] leading-[18px] text-ink-muted"
+                    parentClassName="font-sans"
+                  />
                   {/* Named one and counted the rest: ten chips would bury the
                       author's own name above them. */}
                   {circles.length > 1 ? (

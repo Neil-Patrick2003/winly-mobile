@@ -39,6 +39,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 /**
  * Start a circle.
  *
+ * Top-level only. A circle inside another is made from the website, on the
+ * owner's manage page — it decides who ends up able to read a group's wins, and
+ * that is a decision to make sitting down rather than on a phone.
+ *
  * There is nothing to choose about who can see it: every circle is open, and a
  * control offering otherwise would describe a feature that does not exist.
  */

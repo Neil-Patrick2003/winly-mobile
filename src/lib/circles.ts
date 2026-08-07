@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from '@/lib/api';
 import type { Page, Post } from '@/lib/posts';
 import type { UserSummary } from '@/lib/stories';
 
@@ -18,6 +18,30 @@ export type Circle = {
   color_hex: string;
   tag: string | null;
   is_private: boolean;
+  /**
+   * The circle this one sits inside, or null when it stands on its own.
+   *
+   * A sub-circle is a smaller room in a bigger house: its members are drawn
+   * from the parent's, and a win shared into it carries out to the parent as
+   * well. One level only — a room cannot hold rooms.
+   */
+  parent_id: string | null;
+  is_sub_circle: boolean;
+  /**
+   * The circle it sits inside, by name, where the endpoint loaded it.
+   *
+   * Enough to write "Beginners (Morning Sitters)" and no more — a screen that
+   * wants the whole parent can ask for it by id.
+   */
+  parent?: { id: string; name: string } | null;
+  /**
+   * How many of your own wins are not on this circle's wall yet.
+   *
+   * A win goes to the circles you were in when you posted it, so a circle
+   * joined later has none of your history. Absent where the endpoint did not
+   * work it out — only the circle's own screen asks.
+   */
+  syncable_posts_count?: number;
   members_count: number;
   /**
    * How much has been shared into it. Absent where the endpoint did not count
@@ -305,6 +329,55 @@ export async function unblockMember(circleId: string, userId: string, token: str
 }
 
 /** GET /api/v1/circles/{id}/blocks — who has been barred. Owner only. */
+/**
+ * GET /api/v1/circles/{id}/sub-circles — the rooms inside one circle.
+ *
+ * Answered to anybody who may see the parent: knowing a group has a beginners'
+ * room is not the same as being able to read it, and each room's wall is still
+ * gated on its own. Not paginated — a circle with more rooms than one answer
+ * holds has outgrown the shape.
+ */
+/**
+ * POST /api/v1/circles/{id}/sync-my-posts — bring your earlier wins in.
+ *
+ * Members only, and your own wins only. Any of them, whatever each was shared
+ * to when you wrote it: you are standing in the circle asking, which is the
+ * same choice as picking it at the time. Pressing twice shares nothing twice,
+ * and it never unshares what is already on the wall.
+ */
+export async function syncMyPostsToCircle(circleId: string, token: string) {
+  const response = await apiPost<{
+    data: { id: string; shared: number; syncable_posts_count: number };
+  }>(`/api/v1/circles/${circleId}/sync-my-posts`, undefined, token);
+
+  return response.data;
+}
+
+export async function fetchSubCircles(circleId: string, token: string) {
+  const response = await apiGet<{ data: Circle[] }>(
+    `/api/v1/circles/${circleId}/sub-circles`,
+    token
+  );
+
+  return response.data;
+}
+
+/**
+ * PUT /api/v1/circles/{id}/owner/{user} — hand a room to one of its members.
+ *
+ * The parent's owner decides who keeps the room they opened. Only a sub-circle
+ * has this, and only somebody already in it can be given it.
+ */
+export async function assignCircleOwner(circleId: string, userId: string, token: string) {
+  const response = await apiPut<{ data: Circle }>(
+    `/api/v1/circles/${circleId}/owner/${userId}`,
+    undefined,
+    token
+  );
+
+  return response.data;
+}
+
 export function fetchBlockedMembers(
   circleId: string,
   token: string,
