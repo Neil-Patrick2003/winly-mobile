@@ -106,6 +106,12 @@ function RootNavigator() {
       <Stack.Screen name="index" />
       <Stack.Screen name="register" options={SWAP} />
       <Stack.Screen name="login" options={SWAP} />
+      {/* The two steps of a forgotten password. Pushed rather than swapped:
+          they are a route onward from sign-in and from each other, not another
+          way of doing the same thing, and the back gesture should walk them
+          back one at a time. */}
+      <Stack.Screen name="forgot-password" />
+      <Stack.Screen name="reset-password" />
       <Stack.Screen name="settings" />
       {/* Reached from your own profile, and pushed rather than presented: it is
           a place you go and come back from, not a task you finish. */}

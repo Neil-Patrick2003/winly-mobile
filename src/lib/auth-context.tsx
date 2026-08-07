@@ -15,8 +15,10 @@ import {
   loginRequest,
   logoutRequest,
   registerRequest,
+  resetPasswordRequest,
   type LoginInput,
   type RegisterInput,
+  type ResetPasswordInput,
   type User,
 } from '@/lib/auth';
 import { registerForPush, unregisterFromPush } from '@/lib/push';
@@ -35,6 +37,15 @@ type AuthContextValue = {
    * and the next launch starts at the sign-in screen.
    */
   login: (input: LoginInput, remember?: boolean) => Promise<void>;
+  /**
+   * Set a new password from an emailed code and adopt the session that comes
+   * back with it.
+   *
+   * The server revokes every token the account had before issuing that one, so
+   * this signs the user's other devices out as a side effect — which is the
+   * point when the reason for resetting was that somebody else was in there.
+   */
+  resetPassword: (input: ResetPasswordInput) => Promise<void>;
   logout: () => Promise<void>;
   /**
    * Re-read the user. Counters live on that record — `wins_count`, `streak_days`
@@ -127,6 +138,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [adopt]
   );
 
+  // Remembered without asking, like signing up: proving you hold the address
+  // and choosing the password here is a more deliberate act than signing in,
+  // and being asked to type the new password again immediately would read as
+  // the reset not having worked.
+  const resetPassword = useCallback(
+    async (input: ResetPasswordInput) => adopt(await resetPasswordRequest(input), true),
+    [adopt]
+  );
+
   const refreshUser = useCallback(async () => {
     if (!token) return;
     try {
@@ -169,10 +189,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isRestoring,
       register,
       login,
+      resetPassword,
       logout,
       refreshUser,
     }),
-    [user, token, isRestoring, register, login, logout, refreshUser]
+    [user, token, isRestoring, register, login, resetPassword, logout, refreshUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

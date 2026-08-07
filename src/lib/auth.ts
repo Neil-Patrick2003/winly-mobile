@@ -116,6 +116,45 @@ export function loginRequest(input: LoginInput) {
 }
 
 /**
+ * POST /api/v1/forgot-password — emails a six-digit code.
+ *
+ * Answers 200 whether or not the address has an account, and whether or not a
+ * code was actually sent: the server will not send a second one inside a
+ * minute. Nothing in the response distinguishes those cases, deliberately — so
+ * the screen must move on to the code step regardless of what comes back.
+ */
+export function requestPasswordResetCode(email: string) {
+  return apiPost<{ message: string }>('/api/v1/forgot-password', { email: email.trim() });
+}
+
+export type ResetPasswordInput = {
+  email: string;
+  code: string;
+  password: string;
+  passwordConfirmation: string;
+};
+
+/**
+ * POST /api/v1/reset-password — spends the code and returns a live session.
+ *
+ * Every token the account had is revoked first, including any this device was
+ * holding, and the one that comes back is the replacement. A wrong code, an
+ * expired one and an unknown address all arrive as the same 422 under `code`.
+ *
+ * The code is good for 15 minutes and only once — a second attempt with the
+ * same digits fails even if the first one succeeded.
+ */
+export function resetPasswordRequest(input: ResetPasswordInput) {
+  return apiPost<AuthResponse>('/api/v1/reset-password', {
+    email: input.email.trim(),
+    code: input.code.trim(),
+    password: input.password,
+    password_confirmation: input.passwordConfirmation,
+    device_name: getDeviceName(),
+  });
+}
+
+/**
  * POST /api/v1/logout — deletes the token the request was made with, and only
  * that one. Sessions on the user's other devices are untouched. Responds 204.
  */
