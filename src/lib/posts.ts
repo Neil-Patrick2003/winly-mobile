@@ -513,6 +513,48 @@ export async function setLiked(postId: string, liked: boolean, token: string) {
   return response.data;
 }
 
+/**
+ * Somebody who liked a post, and when.
+ *
+ * The same flattened shape every list of people in this API uses — a liker is
+ * a person with a timestamp attached, not a wrapper around one — so the rows a
+ * follows list already draws work here unchanged.
+ *
+ * Structurally a `UserSummary` from `stories.ts`, and deliberately not imported
+ * from there: that module already imports from this one, and a post's likers
+ * have nothing to do with stories.
+ */
+export type PostLiker = {
+  id: string;
+  full_name: string;
+  username: string | null;
+  avatar_url: string | null;
+  is_following: boolean;
+  has_active_story: boolean;
+  has_unseen_story: boolean;
+  liked_at: string | null;
+};
+
+/**
+ * GET /api/v1/posts/{postId}/likes — who liked it, most recent first.
+ *
+ * Gated on being able to read the post rather than on having written it, which
+ * is the difference between this and a story's viewer list: a like is a public
+ * act on something you can already see, so naming who left it reveals nothing
+ * the count did not. A post you may not read answers 403.
+ */
+export function fetchPostLikes(
+  postId: string,
+  token: string,
+  cursor?: string,
+  perPage = PER_PAGE
+) {
+  const query = new URLSearchParams({ per_page: String(perPage) });
+  if (cursor) query.set('cursor', cursor);
+
+  return apiGet<Page<PostLiker>>(`/api/v1/posts/${postId}/likes?${query.toString()}`, token);
+}
+
 /** What the save endpoints answer with: where the reader stands with a post. */
 export type SavedState = { post_id: string; viewer_has_saved: boolean };
 

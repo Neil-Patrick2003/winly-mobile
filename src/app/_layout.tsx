@@ -137,6 +137,10 @@ function RootNavigator() {
       {/* Rewriting a post is a task you finish or abandon, like editing your
           own details — so a modal, and for the same reason. */}
       <Stack.Screen name="posts/[postId]/edit" options={{ presentation: 'modal' }} />
+      {/* Who liked a post — a modal over whichever card the count was tapped
+          on, so closing it puts you back exactly where you were. Presented the
+          same way as a story's viewers, which answers the same question. */}
+      <Stack.Screen name="posts/[postId]/likes" options={{ presentation: 'modal' }} />
       {/* Stories take the whole screen and are watched, not navigated: the
           fade keeps the rail from sliding away under them, and composing one
           is a modal because it is a task you finish or abandon. */}

@@ -12,8 +12,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PILLAR_THEME } from '@/components/entry-chrome';
+import { ProfileAvatar } from '@/components/profile-avatar';
 import { ProfileCover } from '@/components/profile-cover';
-import { ImageWithPlaceholder } from '@/components/ui/image';
 import { Wordmark } from '@/components/wordmark';
 import { BottomTabInset, Colors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -292,20 +292,7 @@ export default function ProfileScreen() {
 
         <View className="-mt-12 flex-row items-end justify-between px-4">
           <View>
-            {/* A ring of the page colour, so the avatar reads as sitting on the
-                cover rather than punched out of it. */}
-            <View className="rounded-full bg-surface p-1">
-              <ImageWithPlaceholder
-                source={{ uri: user.avatar_url }}
-                className="h-24 w-24 rounded-full"
-                accessibilityLabel={`${user.full_name} profile photo`}>
-                <View className="h-24 w-24 items-center justify-center rounded-full bg-primary">
-                  <Text className="font-heading-bold text-4xl leading-[44px] text-white">
-                    {initial}
-                  </Text>
-                </View>
-              </ImageWithPlaceholder>
-            </View>
+            <ProfileAvatar uri={user.avatar_url} name={user.full_name} initial={initial} />
 
             {user.has_active_story ? (
               <View className="absolute bottom-1 right-1 h-5 w-5 rounded-full border-2 border-surface bg-primary" />
