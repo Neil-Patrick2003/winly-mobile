@@ -5,46 +5,82 @@ import { Dimensions, StyleSheet, View } from 'react-native';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
-const INITIAL_SCALE_FACTOR = Dimensions.get('screen').height / 90;
-const DURATION = 600;
+import { Brand } from '@/constants/theme';
 
+const INITIAL_SCALE_FACTOR = Dimensions.get('screen').height / 90;
+
+/**
+ * How long the whole reveal takes, in milliseconds.
+ *
+ * Long enough to read as deliberate, short enough that somebody opening the app
+ * to log a two-minute win is not made to watch it.
+ */
+const DURATION = 1100;
+
+/**
+ * The colour the splash wears.
+ *
+ * One flat green rather than the sweep it used to be: the palette carries the
+ * brand now, and a gradient over it only says the same thing twice.
+ */
+const BRAND_GROUND = Brand.primary;
+
+/**
+ * What covers the app while it boots, and how it gets out of the way.
+ *
+ * Two animations run together rather than one. The mark rushes toward the
+ * viewer while the colour behind it fades, so the splash reads as being passed
+ * through rather than switched off — the welcome screen is already mounted
+ * underneath and is simply uncovered.
+ *
+ * The static branch is what the native splash hands over to: same colour, same
+ * mark, same size, so nothing jumps at the seam. Only once it has laid out is
+ * the native splash hidden, which is what stops a white frame appearing
+ * between the two.
+ */
 export function AnimatedSplashOverlay() {
   const [animate, setAnimate] = useState(false);
   const [visible, setVisible] = useState(true);
 
   if (!visible) return null;
 
-  const splashKeyframe = new Keyframe({
-    0: {
-      transform: [{ scale: 1 }],
+  // Held back until the colour has had a moment on screen, then thrown at
+  // the viewer. The pause is what keeps it from looking like a glitch.
+  const markKeyframe = new Keyframe({
+    0: { transform: [{ scale: 1 }], opacity: 1 },
+    45: { transform: [{ scale: 1 }], opacity: 1 },
+    58: {
+      // A breath inward, so the zoom has something to spring from.
+      transform: [{ scale: 0.92 }],
       opacity: 1,
-    },
-    20: {
-      opacity: 1,
-    },
-    70: {
-      opacity: 0,
-      easing: Easing.elastic(0.7),
+      easing: Easing.out(Easing.quad),
     },
     100: {
+      transform: [{ scale: 9 }],
       opacity: 0,
-      transform: [{ scale: 1 }],
-      easing: Easing.elastic(0.7),
+      easing: Easing.in(Easing.cubic),
     },
   });
 
-  const image = <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />;
+  // Fades late, so the mark is already moving before the colour goes.
+  const groundKeyframe = new Keyframe({
+    0: { opacity: 1 },
+    62: { opacity: 1 },
+    100: { opacity: 0, easing: Easing.in(Easing.quad) },
+  });
+
+  const mark = <Image style={styles.brandMark} source={require('@/assets/images/brand/welle_logo.png')} />;
 
   return animate ? (
     <Animated.View
-      entering={splashKeyframe.duration(DURATION).withCallback((finished) => {
+      entering={groundKeyframe.duration(DURATION).withCallback((finished) => {
         'worklet';
         if (finished) {
           scheduleOnRN(setVisible, false);
         }
       })}
-      style={styles.splashOverlay}>
-      {image}
+      style={styles.brandOverlay}>
+      <Animated.View entering={markKeyframe.duration(DURATION)}>{mark}</Animated.View>
     </Animated.View>
   ) : (
     <View
@@ -53,12 +89,16 @@ export function AnimatedSplashOverlay() {
           setAnimate(true);
         });
       }}
-      style={styles.splashOverlay}>
-      {image}
+      style={styles.brandOverlay}>
+      {mark}
     </View>
   );
 }
 
+/*
+ * The three below belong to `AnimatedIcon`, the welcome screen's own mark.
+ * Untouched — only the splash overlay above was rebranded.
+ */
 const keyframe = new Keyframe({
   0: {
     transform: [{ scale: INITIAL_SCALE_FACTOR }],
@@ -133,14 +173,25 @@ const styles = StyleSheet.create({
   },
   background: {
     borderRadius: 40,
-    experimental_backgroundImage: `linear-gradient(180deg, #3C9FFE, #0274DF)`,
+    backgroundColor: Brand.accent,
     width: 128,
     height: 128,
     position: 'absolute',
   },
+  brandMark: {
+    width: 132,
+    height: 132,
+  },
+  brandOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: BRAND_GROUND,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  },
   splashOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#208AEF',
+    backgroundColor: Brand.accent,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,

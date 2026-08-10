@@ -1,9 +1,92 @@
-:root {
-  --font-display:
-    Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji,
+@import 'tailwindcss';
+@import 'uniwind';
+
+@theme {
+  /* Brand type stack — the family names are registered at runtime by
+     expo-font (see hooks/use-brand-fonts.ts), with system fallbacks.
+     These are static (non-variable) faces: set the family alone and leave
+     font-weight off, otherwise Android synthesizes a second, wrong weight.
+     Names avoid Tailwind's own weight utilities (font-medium, font-bold,
+     font-semibold) so the two never collide on one class name. */
+  --font-logo:
+    PlusJakartaSans_700Bold, 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-logo-extrabold:
+    PlusJakartaSans_800ExtraBold, 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  /* Headings are a serif now, so the fallbacks are too — a heading dropping to
+     a sans while the face loads is a bigger jump than one dropping to Georgia. */
+  --font-heading: PlayfairDisplay_600SemiBold, 'Playfair Display', ui-serif, Georgia, serif;
+  --font-heading-bold: PlayfairDisplay_700Bold, 'Playfair Display', ui-serif, Georgia, serif;
+  --font-sans:
+    Inter_400Regular, Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji,
     Segoe UI Symbol, Noto Color Emoji;
+  --font-body-medium: Inter_500Medium, Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-body-semibold: Inter_600SemiBold, Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-body-bold: Inter_700Bold, Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-sans);
   --font-mono:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
   --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
   --font-serif: Georgia, 'Times New Roman', serif;
+
+  /* Welle "Forest" palette. Declared here so the utilities exist (bg-primary,
+     text-ink, border-hairline, …); the per-scheme values live in the @layer
+     theme block below. Keep in sync with constants/theme.ts.
+
+     Four brand colours and a page: forest, primary, secondary, accent, surface.
+     Everything else here is derived from them — the greys are tinted towards
+     the same green rather than left on slate, which is what stops a warm page
+     reading as a cool app with the background swapped. */
+  --color-forest: #0f3d2e;
+  --color-primary: #2e7d56;
+  --color-primary-fg: #ffffff;
+  --color-secondary: #4db6ac;
+  --color-accent: #5a7bd8;
+  --color-highlight: #fb7185;
+  --color-sunshine: #facc15;
+  --color-surface: #f4f7f2;
+  --color-surface-card: #ffffff;
+  --color-surface-selected: #e7ede4;
+  --color-ink: #0f3d2e;
+  --color-ink-muted: #4f7263;
+  --color-hairline: #e1e9de;
+}
+
+@layer theme {
+  :root {
+    @variant light {
+      --color-forest: #0f3d2e;
+      --color-primary: #2e7d56;
+      --color-primary-fg: #ffffff;
+      --color-secondary: #4db6ac;
+      --color-accent: #5a7bd8;
+      --color-highlight: #fb7185;
+      --color-sunshine: #facc15;
+      --color-surface: #f4f7f2;
+      --color-surface-card: #ffffff;
+      --color-surface-selected: #e7ede4;
+      --color-ink: #0f3d2e;
+      --color-ink-muted: #4f7263;
+      --color-hairline: #e1e9de;
+    }
+
+    /* Lifted toward the lighter end of each hue so they clear contrast on the
+       forest ground — #2e7d56 is a button colour on paper and a smudge on it.
+       The page is the brand green taken darker still, so the card sitting on it
+       can be the brand green itself. */
+    @variant dark {
+      --color-forest: #0f3d2e;
+      --color-primary: #4db07c;
+      --color-primary-fg: #06251a;
+      --color-secondary: #6ecfc6;
+      --color-accent: #8aa4e6;
+      --color-highlight: #fda4af;
+      --color-sunshine: #fde047;
+      --color-surface: #0b241b;
+      --color-surface-card: #0f3d2e;
+      --color-surface-selected: #1c5641;
+      --color-ink: #f4f7f2;
+      --color-ink-muted: #a3bfb2;
+      --color-hairline: #1c5641;
+    }
+  }
 }

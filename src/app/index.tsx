@@ -1,98 +1,85 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Link, Redirect } from 'expo-router';
+import { Pressable, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { LeafDivider } from '@/components/leaf';
+import { Image } from '@/components/ui/image';
+import { Wordmark } from '@/components/wordmark';
+import { useAuth } from '@/lib/auth-context';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+/**
+ * The welcome illustration is a fixed light artwork, and dark-scheme text would
+ * disappear against it. The whole app is pinned light in the root layout, so
+ * that is handled — which is why there are no `dark:` variants here.
+ */
+export default function WelcomeScreen() {
+  const insets = useSafeAreaInsets();
+  const { isAuthenticated } = useAuth();
+
+  // A stored token was already exchanged for a user before the navigator
+  // mounted, so anyone still signed in skips the sign-up pitch entirely.
+  if (isAuthenticated) return <Redirect href="/(tabs)/home" />;
+
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
+    <View className="flex-1 bg-surface">
+      <Image
+        source={require('@/assets/images/illustrations/welcome_bg2.png')}
+        className="absolute inset-0 opacity-90"
+        contentFit="cover"
+        contentPosition="bottom center"
+      />
+
+      <View
+        className="w-full max-w-[800px] flex-1 select-none justify-between self-center px-4"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom + 24 }}>
+        <View className="items-center gap-2 pt-8">
+          <Image
+            source={require('@/assets/images/brand/welle_logo.png')}
+            className="h-[120px] w-[148px]"
+            contentFit="cover"
+          />
+          <Wordmark />
+          <Text className="text-center font-sans text-sm leading-6 text-ink-muted">
+            True Wealth Starts Within.
+          </Text>
+          <LeafDivider />
+          <Text className="text-center font-sans text-sm leading-6 text-ink-muted">
+            Welle is a positive community where you can share your self-care, celebrate small wins,
+            and grow together.
+          </Text>
+        </View>
+
+        {/* Both buttons sit over the dark foliage at the foot of the artwork,
+            which is what lets the outlined one be drawn in light at all — the
+            same pair over the pale sky above would be invisible.
+
+            Filled for the way in, outlined for the way back: the pairing the
+            rest of the app uses for a choice with one obvious answer. */}
+        <View className="gap-2">
+          <Link href="/login" asChild>
+            <Pressable
+              accessibilityRole="button"
+              className="items-center rounded-full bg-primary py-4 active:opacity-85">
+              <Text className="font-body-semibold text-base leading-6 text-primary-fg">
+                Login
+              </Text>
+            </Pressable>
+          </Link>
+
+          <Link href="/register" asChild>
+            <Pressable
+              accessibilityRole="button"
+              // `border-primary-fg` rather than a cream from Tailwind's own
+              // scale: the Forest palette has no amber, and this is the same
+              // white the filled button's label is set in.
+              className="items-center rounded-full border border-primary-fg py-4 active:opacity-85">
+              <Text className="font-body-semibold text-base leading-6 text-primary-fg">
+                Create an Account
+              </Text>
+            </Pressable>
+          </Link>
+        </View>
+      </View>
+    </View>
   );
 }
-
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
-});
