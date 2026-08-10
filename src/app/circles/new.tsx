@@ -3,7 +3,6 @@ import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Pressable,
   ScrollView,
@@ -20,6 +19,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { createCircle } from '@/lib/circles';
+import { useAlert } from '@/lib/confirm';
 import { useToast } from '@/lib/toast';
 import { goBack } from '@/lib/navigation';
 
@@ -54,6 +54,7 @@ export default function NewCircleScreen() {
   const keyboardVisible = useKeyboardVisible();
   const { token } = useAuth();
   const showToast = useToast();
+  const alert = useAlert();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -85,10 +86,10 @@ export default function NewCircleScreen() {
         return;
       }
 
-      Alert.alert(
-        'Could not start that circle',
-        caught instanceof Error ? caught.message : 'Something went wrong. Please try again.'
-      );
+      await alert({
+        title: 'Could not start that circle',
+        message: caught instanceof Error ? caught.message : 'Something went wrong. Please try again.',
+      });
     }
   };
 

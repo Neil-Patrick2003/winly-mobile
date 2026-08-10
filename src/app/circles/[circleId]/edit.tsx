@@ -3,7 +3,6 @@ import { SymbolView } from 'expo-symbols';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Pressable,
   ScrollView,
@@ -21,7 +20,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { fetchCircle, updateCircle, type Circle } from '@/lib/circles';
-import { useConfirm } from '@/lib/confirm';
+import { useAlert, useConfirm } from '@/lib/confirm';
 import { useToast } from '@/lib/toast';
 import { goBack } from '@/lib/navigation';
 
@@ -59,6 +58,7 @@ export default function EditCircleScreen() {
   const { token } = useAuth();
   const showToast = useToast();
   const confirm = useConfirm();
+  const alert = useAlert();
 
   const [circle, setCircle] = useState<Circle | null>(null);
   const [name, setName] = useState('');
@@ -153,10 +153,10 @@ export default function EditCircleScreen() {
         return;
       }
 
-      Alert.alert(
-        'Could not save those changes',
-        caught instanceof Error ? caught.message : 'Something went wrong. Please try again.'
-      );
+      await alert({
+        title: 'Could not save those changes',
+        message: caught instanceof Error ? caught.message : 'Something went wrong. Please try again.',
+      });
     }
   };
 

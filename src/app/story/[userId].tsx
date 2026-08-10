@@ -1,11 +1,12 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Easing, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Easing, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ImageWithPlaceholder } from '@/components/ui/image';
 import { useAuth } from '@/lib/auth-context';
+import { useAlert, useConfirm } from '@/lib/confirm';
 import {
   deleteStory,
   fetchStoryReels,
@@ -196,6 +197,8 @@ export default function StoryViewerScreen() {
   const { userId } = useLocalSearchParams<{ userId: string }>();
   const insets = useSafeAreaInsets();
   const { token, user } = useAuth();
+  const confirm = useConfirm();
+  const alert = useAlert();
 
   const [reels, setReels] = useState<StoryReel[]>([]);
   // Which person, and which of their stories. -1 until the fetch says who the
@@ -427,48 +430,61 @@ export default function StoryViewerScreen() {
    * countdown holds while the question is up — a story sliding out from under
    * a dialog would leave the answer applying to the wrong one.
    */
-  const remove = useCallback(() => {
+  const remove = useCallback(async () => {
     if (!current || !token) return;
 
     setPaused(true);
-    Alert.alert('Delete this story?', 'It disappears for everyone straight away.', [
-      { text: 'Cancel', style: 'cancel', onPress: () => setPaused(false) },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          void (async () => {
-            const remaining = stories.filter((story) => story.id !== current.id);
 
-            try {
-              await deleteStory(current.id, token);
-              updateStories(() => remaining);
+    const confirmed = await confirm({
+      title: 'Delete this story?',
+      message: 'It disappears for everyone straight away.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
 
-              // The one that went was the last still ahead, so this run is
-              // over — carry on into the next person's rather than sitting on
-              // an index pointing past the end.
-              if (index >= remaining.length) {
-                const following = reelWithStories(reelIndex + 1, 1);
-                if (following === -1) {
-                  close();
-                } else {
-                  setReelIndex(following);
-                  setIndex(0);
-                }
-              }
-            } catch (caught) {
-              Alert.alert(
-                'Could not delete that story',
-                caught instanceof Error ? caught.message : 'Please try again.'
-              );
-            } finally {
-              setPaused(false);
-            }
-          })();
-        },
-      },
-    ]);
-  }, [current, token, stories, index, reelIndex, reelWithStories, updateStories, close]);
+    if (!confirmed) {
+      setPaused(false);
+      return;
+    }
+
+    const remaining = stories.filter((story) => story.id !== current.id);
+
+    try {
+      await deleteStory(current.id, token);
+      updateStories(() => remaining);
+
+      // The one that went was the last still ahead, so this run is over —
+      // carry on into the next person's rather than sitting on an index
+      // pointing past the end.
+      if (index >= remaining.length) {
+        const following = reelWithStories(reelIndex + 1, 1);
+        if (following === -1) {
+          close();
+        } else {
+          setReelIndex(following);
+          setIndex(0);
+        }
+      }
+    } catch (caught) {
+      await alert({
+        title: 'Could not delete that story',
+        message: caught instanceof Error ? caught.message : 'Please try again.',
+      });
+    } finally {
+      setPaused(false);
+    }
+  }, [
+    current,
+    token,
+    stories,
+    index,
+    reelIndex,
+    reelWithStories,
+    updateStories,
+    close,
+    confirm,
+    alert,
+  ]);
 
   if (loading) {
     return (
@@ -574,7 +590,7 @@ export default function StoryViewerScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Delete this story"
-              onPress={remove}
+              onPress={() => void remove()}
               hitSlop={10}
               className="p-1 active:opacity-60">
               <SymbolView

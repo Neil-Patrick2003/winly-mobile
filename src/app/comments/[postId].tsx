@@ -3,7 +3,6 @@ import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   KeyboardAvoidingView,
   Pressable,
@@ -21,6 +20,7 @@ import { MenuButton, type MenuItem } from '@/components/ui/menu';
 import { useKeyboardVisible } from '@/hooks/use-keyboard-visible';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
+import { useConfirm } from '@/lib/confirm';
 import { useFeed } from '@/lib/feed-context';
 import {
   createComment,
@@ -214,6 +214,7 @@ export default function CommentsScreen() {
   const { user, token } = useAuth();
   const { posts, adjustComments, adoptSavedState } = useFeed();
   const showToast = useToast();
+  const confirm = useConfirm();
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -387,43 +388,34 @@ export default function CommentsScreen() {
     }
   };
 
-  const confirmDelete = (comment: Comment) => {
+  const confirmDelete = async (comment: Comment) => {
     // Removing someone else's words off your own post is a different act from
     // deleting your own, so the prompt says whose it is rather than leaving the
     // reader to check the row behind the dialog.
     const theirs = comment.author.id !== user?.id;
 
-    Alert.alert(
-      theirs ? `Delete ${comment.author.full_name}'s comment?` : 'Delete comment?',
-      'This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            if (!token) return;
+    const confirmed = await confirm({
+      title: theirs ? `Delete ${comment.author.full_name}'s comment?` : 'Delete comment?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
 
-            // Gone from the list first: the confirmation has already been
-            // given, and a row that lingers while the request runs reads as a
-            // failure.
-            const previous = comments;
-            setComments((current) => current.filter((item) => item.id !== comment.id));
+    if (!confirmed || !token) return;
 
-            try {
-              const result = await deleteComment(comment.id, token);
-              // Unlike creating, this one does hand back the new total.
-              adjustComments(result.post_id, { to: result.comments_count });
-            } catch (caught) {
-              setComments(previous);
-              showToast(
-                caught instanceof Error ? caught.message : 'Could not delete that comment.'
-              );
-            }
-          },
-        },
-      ]
-    );
+    // Gone from the list first: the confirmation has already been given, and a
+    // row that lingers while the request runs reads as a failure.
+    const previous = comments;
+    setComments((current) => current.filter((item) => item.id !== comment.id));
+
+    try {
+      const result = await deleteComment(comment.id, token);
+      // Unlike creating, this one does hand back the new total.
+      adjustComments(result.post_id, { to: result.comments_count });
+    } catch (caught) {
+      setComments(previous);
+      showToast(caught instanceof Error ? caught.message : 'Could not delete that comment.');
+    }
   };
 
   const canSend = draft.trim().length > 0 && !sending;
@@ -481,7 +473,7 @@ export default function CommentsScreen() {
               // quietly falls back to the stricter author-only rule.
               canDelete={user?.id === item.author.id || user?.id === post?.author.id}
               onSave={(text) => save(item, text)}
-              onDelete={() => confirmDelete(item)}
+              onDelete={() => void confirmDelete(item)}
             />
           )}
           contentContainerClassName="w-full max-w-[800px] self-center"

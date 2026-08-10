@@ -3,7 +3,6 @@ import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Pressable,
   ScrollView,
@@ -18,6 +17,7 @@ import { ImageWithPlaceholder } from '@/components/ui/image';
 import { useKeyboardVisible } from '@/hooks/use-keyboard-visible';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
+import { useAlert } from '@/lib/confirm';
 import { formatBytes, isWithinUploadLimit, MAX_UPLOAD_BYTES, shrinkAsset } from '@/lib/media';
 import type { LocalFile } from '@/lib/posts';
 import { createStory } from '@/lib/stories';
@@ -49,6 +49,7 @@ export default function NewStoryScreen() {
   const keyboardVisible = useKeyboardVisible();
   const { token } = useAuth();
   const showToast = useToast();
+  const alert = useAlert();
 
   const [photo, setPhoto] = useState<LocalFile | null>(null);
   const [caption, setCaption] = useState('');
@@ -58,10 +59,10 @@ export default function NewStoryScreen() {
   const pick = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert(
-        'Photo access needed',
-        'Enable photo access for Welle in Settings to add a story.'
-      );
+      void alert({
+        title: 'Photo access needed',
+        message: 'Enable photo access for Welle in Settings to add a story.',
+      });
       return;
     }
 
@@ -86,10 +87,10 @@ export default function NewStoryScreen() {
       const prepared = await shrinkAsset(asset);
 
       if (!isWithinUploadLimit(prepared)) {
-        Alert.alert(
-          'That photo is too large',
-          `Stories are capped at ${formatBytes(MAX_UPLOAD_BYTES)}. Try a smaller one.`
-        );
+        void alert({
+          title: 'That photo is too large',
+          message: `Stories are capped at ${formatBytes(MAX_UPLOAD_BYTES)}. Try a smaller one.`,
+        });
         return;
       }
 
@@ -109,10 +110,10 @@ export default function NewStoryScreen() {
       goBack();
     } catch (caught) {
       setPosting(false);
-      Alert.alert(
-        'Could not share your story',
-        caught instanceof Error ? caught.message : 'Something went wrong. Please try again.'
-      );
+      await alert({
+        title: 'Could not share your story',
+        message: caught instanceof Error ? caught.message : 'Something went wrong. Please try again.',
+      });
     }
   };
 

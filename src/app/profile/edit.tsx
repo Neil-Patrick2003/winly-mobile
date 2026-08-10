@@ -3,7 +3,6 @@ import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Pressable,
   ScrollView,
@@ -20,6 +19,7 @@ import { useKeyboardVisible } from '@/hooks/use-keyboard-visible';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useAlert } from '@/lib/confirm';
 import { formatBytes, isWithinUploadLimit, MAX_UPLOAD_BYTES, shrinkAsset } from '@/lib/media';
 import type { LocalFile } from '@/lib/posts';
 import {
@@ -81,6 +81,7 @@ export default function EditProfileScreen() {
   const keyboardVisible = useKeyboardVisible();
   const { user, token, refreshUser } = useAuth();
   const showToast = useToast();
+  const alert = useAlert();
 
   const [fullName, setFullName] = useState(user?.full_name ?? '');
   const [username, setUsername] = useState(user?.username ?? '');
@@ -114,10 +115,10 @@ export default function EditProfileScreen() {
   const pick = async (kind: 'avatar' | 'cover') => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert(
-        'Photo access needed',
-        'Enable photo access for Welle in Settings to change your picture.'
-      );
+      void alert({
+        title: 'Photo access needed',
+        message: 'Enable photo access for Welle in Settings to change your picture.',
+      });
       return;
     }
 
@@ -141,10 +142,10 @@ export default function EditProfileScreen() {
       const prepared = await shrinkAsset(asset);
 
       if (!isWithinUploadLimit(prepared)) {
-        Alert.alert(
-          'That photo is too large',
-          `Profile photos are capped at ${formatBytes(MAX_UPLOAD_BYTES)}. Try a smaller one.`
-        );
+        void alert({
+          title: 'That photo is too large',
+          message: `Profile photos are capped at ${formatBytes(MAX_UPLOAD_BYTES)}. Try a smaller one.`,
+        });
         return;
       }
 
@@ -215,10 +216,10 @@ export default function EditProfileScreen() {
         return;
       }
 
-      Alert.alert(
-        'Could not save your profile',
-        caught instanceof Error ? caught.message : 'Something went wrong. Please try again.'
-      );
+      await alert({
+        title: 'Could not save your profile',
+        message: caught instanceof Error ? caught.message : 'Something went wrong. Please try again.',
+      });
     }
   };
 

@@ -1,7 +1,7 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CircleName } from '@/components/circle-name';
@@ -20,7 +20,7 @@ import {
   syncMyPostsToCircle,
   type Circle,
 } from '@/lib/circles';
-import { useConfirm } from '@/lib/confirm';
+import { useAlert, useConfirm } from '@/lib/confirm';
 import { useFeed } from '@/lib/feed-context';
 import type { Post } from '@/lib/posts';
 import { goBack } from '@/lib/navigation';
@@ -52,6 +52,7 @@ export default function CircleScreen() {
   const { adoptSavedState } = useFeed();
   const showToast = useToast();
   const confirm = useConfirm();
+  const alert = useAlert();
 
   const [circle, setCircle] = useState<Circle | null>(null);
   /**
@@ -238,12 +239,12 @@ export default function CircleScreen() {
           : previous
       );
     } catch (caught) {
-      Alert.alert(
-        'Could not join that circle',
-        caught instanceof Error ? caught.message : 'Please try again.'
-      );
+      await alert({
+        title: 'Could not join that circle',
+        message: caught instanceof Error ? caught.message : 'Please try again.',
+      });
     }
-  }, [token, circle]);
+  }, [token, circle, alert]);
 
   /**
    * Leave, for anyone who is in it.
@@ -277,12 +278,12 @@ export default function CircleScreen() {
       );
       showToast(`Left ${circle.name}`);
     } catch (caught) {
-      Alert.alert(
-        'Could not leave that circle',
-        caught instanceof Error ? caught.message : 'Please try again.'
-      );
+      await alert({
+        title: 'Could not leave that circle',
+        message: caught instanceof Error ? caught.message : 'Please try again.',
+      });
     }
-  }, [confirm, token, circle, showToast]);
+  }, [confirm, token, circle, showToast, alert]);
 
   const remove = useCallback(async () => {
     if (!token || !circle) return;
@@ -300,12 +301,12 @@ export default function CircleScreen() {
       await deleteCircle(circle.id, token);
       goBack('/(tabs)/circles');
     } catch (caught) {
-      Alert.alert(
-        'Could not delete that circle',
-        caught instanceof Error ? caught.message : 'Please try again.'
-      );
+      await alert({
+        title: 'Could not delete that circle',
+        message: caught instanceof Error ? caught.message : 'Please try again.',
+      });
     }
-  }, [confirm, token, circle]);
+  }, [confirm, token, circle, alert]);
 
   /**
    * What this person may do to the circle, in order of how much it costs them.

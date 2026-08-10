@@ -1,4 +1,4 @@
-import { createContext, use, useCallback, useRef, useState, type ReactNode } from 'react';
+import { createContext, use, useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Modal, Platform, Pressable, Text, View } from 'react-native';
 
 /**
@@ -18,24 +18,55 @@ export type ConfirmOptions = {
   destructive?: boolean;
 };
 
-type Pending = ConfirmOptions & { resolve: (confirmed: boolean) => void };
+/**
+ * Something to say rather than something to ask: one button, which only
+ * dismisses it.
+ *
+ * This exists because `Alert.alert` is an empty function on web — react-native-web
+ * ships `class Alert { static alert() {} }` — so every error reported through it
+ * was invisible in the browser. A failed share re-enabled its button and said
+ * nothing at all, which reads as the button being broken.
+ */
+export type AlertOptions = {
+  title: string;
+  message?: string;
+  /** Defaults to "OK". */
+  confirmLabel?: string;
+};
 
-const ConfirmContext = createContext<((options: ConfirmOptions) => Promise<boolean>) | null>(null);
+type Pending = ConfirmOptions & {
+  resolve: (confirmed: boolean) => void;
+  /** One button instead of two, because nothing is being asked. */
+  alert?: boolean;
+};
+
+type Dialogs = {
+  confirm: (options: ConfirmOptions) => Promise<boolean>;
+  alert: (options: AlertOptions) => Promise<void>;
+};
+
+const ConfirmContext = createContext<Dialogs | null>(null);
 
 /** iOS's own tint for an actionable label, and its red for a destructive one. */
 const IOS_BLUE = '#007AFF';
 const DESTRUCTIVE = '#E5484D';
 
 /**
- * One dialog for every question worth asking twice.
+ * One dialog for every question worth asking twice, and for everything the app
+ * needs to say and be sure was read.
  *
- * `Alert.alert` was doing this job and cannot be styled at all: it is drawn by
+ * `Alert.alert` was doing both jobs and cannot be styled at all: it is drawn by
  * the OS, so it ignores the app's type, its colours and its corners, and looks
  * like two different products across the two platforms. This is the same shape
  * in both places — white card, soft shadow, dimmed backdrop — while still
  * arranging itself the way each platform's own dialogs do, because a dialog
  * that puts its buttons where the platform does not is the one thing people
  * genuinely misread.
+ *
+ * The stronger reason is that `Alert.alert` does not exist on web at all.
+ * react-native-web ships it as an empty method, so both jobs failed silently
+ * there: a message was never shown, and a question's buttons never ran, which
+ * left the action they guarded looking like a control that does nothing.
  *
  * Imperative rather than declarative, because every call site is inside a
  * handler that wants to stop and wait: `if (!(await confirm({…}))) return;`
@@ -52,13 +83,13 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
    */
   const active = useRef<Pending | null>(null);
 
-  const confirm = useCallback((options: ConfirmOptions) => {
+  const open = useCallback((options: ConfirmOptions, alert = false) => {
     // Anything already open is answered "no" rather than left hanging. Two
     // dialogs cannot be shown at once, so the older question is abandoned.
     active.current?.resolve(false);
 
     return new Promise<boolean>((resolve) => {
-      const next = { ...options, resolve };
+      const next = { ...options, alert, resolve };
       active.current = next;
       setPending(next);
     });
@@ -70,8 +101,21 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     setPending(null);
   }, []);
 
+  const dialogs = useMemo<Dialogs>(
+    () => ({
+      confirm: (options) => open(options),
+      // Resolved rather than returned raw so `await alert(…)` can hold a
+      // handler until it has been read — a caller that does not care simply
+      // does not await it.
+      alert: async ({ confirmLabel = 'OK', ...rest }) => {
+        await open({ ...rest, confirmLabel }, true);
+      },
+    }),
+    [open]
+  );
+
   return (
-    <ConfirmContext.Provider value={confirm}>
+    <ConfirmContext.Provider value={dialogs}>
       {children}
 
       <Modal
@@ -111,12 +155,18 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   );
 }
 
-type DialogProps = ConfirmOptions & { onAnswer: (confirmed: boolean) => void };
+type DialogProps = ConfirmOptions & {
+  alert?: boolean;
+  onAnswer: (confirmed: boolean) => void;
+};
 
 /**
  * Centred text, then a row of two equal buttons split by hairlines — the shape
  * of every alert iOS draws itself. Cancel is the bold one, because on iOS the
  * emphasised button is the safe one rather than the suggested one.
+ *
+ * An alert collapses that row to a single full-width button, which is what iOS
+ * does with a one-action alert.
  */
 function IosDialog({
   title,
@@ -124,6 +174,7 @@ function IosDialog({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   destructive,
+  alert,
   onAnswer,
 }: DialogProps) {
   return (
@@ -142,25 +193,31 @@ function IosDialog({
       <View className="h-px bg-hairline" />
 
       <View className="flex-row">
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => onAnswer(false)}
-          className="flex-1 items-center justify-center py-3 active:bg-surface-selected">
-          <Text
-            className="font-body-semibold text-[17px] leading-[22px]"
-            style={{ color: IOS_BLUE }}>
-            {cancelLabel}
-          </Text>
-        </Pressable>
+        {alert ? null : (
+          <>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => onAnswer(false)}
+              className="flex-1 items-center justify-center py-3 active:bg-surface-selected">
+              <Text
+                className="font-body-semibold text-[17px] leading-[22px]"
+                style={{ color: IOS_BLUE }}>
+                {cancelLabel}
+              </Text>
+            </Pressable>
 
-        <View className="w-px bg-hairline" />
+            <View className="w-px bg-hairline" />
+          </>
+        )}
 
         <Pressable
           accessibilityRole="button"
           onPress={() => onAnswer(true)}
           className="flex-1 items-center justify-center py-3 active:bg-surface-selected">
           <Text
-            className="font-sans text-[17px] leading-[22px]"
+            // The lone button on an alert is the emphasised one, since there is
+            // no safer option for the weight to be pointing at.
+            className={`text-[17px] leading-[22px] ${alert ? 'font-body-semibold' : 'font-sans'}`}
             style={{ color: destructive ? DESTRUCTIVE : IOS_BLUE }}>
             {confirmLabel}
           </Text>
@@ -181,6 +238,7 @@ function MaterialDialog({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   destructive,
+  alert,
   onAnswer,
 }: DialogProps) {
   return (
@@ -193,14 +251,16 @@ function MaterialDialog({
       </View>
 
       <View className="flex-row justify-end gap-2">
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => onAnswer(false)}
-          className="rounded-full px-4 py-2.5 active:bg-surface-selected">
-          <Text className="font-body-semibold text-[14px] leading-5 text-ink-muted">
-            {cancelLabel}
-          </Text>
-        </Pressable>
+        {alert ? null : (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => onAnswer(false)}
+            className="rounded-full px-4 py-2.5 active:bg-surface-selected">
+            <Text className="font-body-semibold text-[14px] leading-5 text-ink-muted">
+              {cancelLabel}
+            </Text>
+          </Pressable>
+        )}
 
         <Pressable
           accessibilityRole="button"
@@ -226,5 +286,20 @@ function MaterialDialog({
 export function useConfirm() {
   const context = use(ConfirmContext);
   if (!context) throw new Error('useConfirm must be used inside <ConfirmProvider>');
-  return context;
+  return context.confirm;
+}
+
+/**
+ * Say something, and — if the caller cares to wait — resolve once it has been
+ * dismissed.
+ *
+ * Use this rather than `Alert.alert` for anything the person needs to read.
+ * `Alert.alert` is a no-op on web, so a message sent through it is not shown
+ * late or shown badly: it is not shown at all, and the failure it was reporting
+ * looks like the button doing nothing.
+ */
+export function useAlert() {
+  const context = use(ConfirmContext);
+  if (!context) throw new Error('useAlert must be used inside <ConfirmProvider>');
+  return context.alert;
 }

@@ -1,10 +1,11 @@
 import * as ImagePicker from 'expo-image-picker';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { ImageWithPlaceholder } from '@/components/ui/image';
 import { Colors } from '@/constants/theme';
+import { useAlert } from '@/lib/confirm';
 import { formatBytes, isWithinUploadLimit, MAX_UPLOAD_BYTES, shrinkAsset } from '@/lib/media';
 import type { LocalFile } from '@/lib/posts';
 
@@ -41,14 +42,15 @@ export function MediaPicker({
 }) {
   const atLimit = files.length >= max;
   const [preparing, setPreparing] = useState(false);
+  const alert = useAlert();
 
   const pick = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert(
-        'Photo access needed',
-        'Enable photo access for Welle in Settings to attach an image.'
-      );
+      void alert({
+        title: 'Photo access needed',
+        message: 'Enable photo access for Welle in Settings to attach an image.',
+      });
       return;
     }
 
@@ -76,12 +78,12 @@ export function MediaPicker({
 
       const rejected = prepared.length - added.length;
       if (rejected > 0) {
-        Alert.alert(
-          rejected === 1 ? 'Photo too large' : `${rejected} photos too large`,
-          `Each photo has to be under ${formatBytes(MAX_UPLOAD_BYTES)}. ${
+        void alert({
+          title: rejected === 1 ? 'Photo too large' : `${rejected} photos too large`,
+          message: `Each photo has to be under ${formatBytes(MAX_UPLOAD_BYTES)}. ${
             rejected === 1 ? 'It was' : 'They were'
-          } left out — the rest were added.`
-        );
+          } left out — the rest were added.`,
+        });
       }
     } finally {
       setPreparing(false);
