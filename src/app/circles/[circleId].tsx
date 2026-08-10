@@ -4,7 +4,8 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CircleName } from '@/components/circle-name';
+import { CircleName, circleLabel } from '@/components/circle-name';
+import { CircleVisibilityPicker } from '@/components/circle-visibility-picker';
 import { PostCard } from '@/components/post-card';
 import { MenuButton, type MenuItem } from '@/components/ui/menu';
 import { Colors } from '@/constants/theme';
@@ -18,6 +19,7 @@ import {
   joinCircle,
   leaveCircle,
   syncMyPostsToCircle,
+  updateCircle,
   type Circle,
 } from '@/lib/circles';
 import { useAlert, useConfirm } from '@/lib/confirm';
@@ -65,6 +67,7 @@ export default function CircleScreen() {
    */
   const [inner, setInner] = useState<Circle[]>([]);
   const [syncing, setSyncing] = useState(false);
+  const [savingVisibility, setSavingVisibility] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -309,6 +312,66 @@ export default function CircleScreen() {
   }, [confirm, token, circle, alert]);
 
   /**
+   * Who can find the circle, answered on the circle's own screen.
+   *
+   * The owner's other tools sit behind the menu, and this one does not, because
+   * it is the setting people come back to *check* rather than to change. Stating
+   * it and being able to move it are then the same glance, where a form two taps
+   * away is a trip to find out something the screen was already in a position to
+   * say. Non-owners see the lock badge above instead, which is the same fact
+   * without the switch.
+   */
+  const setVisibility = useCallback(
+    async (nextPrivate: boolean) => {
+      if (!token || !circle || nextPrivate === circle.is_private) return;
+
+      /*
+       * Asked only on the way out into the open, exactly as the edit form asks
+       * it — going private is a step back nobody regrets, and going public puts
+       * a group that has been talking among itself in front of everybody, with
+       * every win already on its wall going too.
+       */
+      if (!nextPrivate) {
+        const confirmed = await confirm({
+          title: `Make ${circleLabel(circle)} public?`,
+          message:
+            'Anyone will be able to find it in Discover and join, and everything already shared into it comes with it.',
+          confirmLabel: 'Make public',
+          destructive: true,
+        });
+
+        if (!confirmed) return;
+      }
+
+      // Moved before the round trip so the radio answers the tap, and put back
+      // if the server refuses: a control that waits on the network to show what
+      // you just chose reads as one that missed the press.
+      const before = circle.is_private;
+      setCircle((previous) => (previous ? { ...previous, is_private: nextPrivate } : previous));
+      setSavingVisibility(true);
+
+      try {
+        // Name only alongside it. Leaving a key out means "as it was", so the
+        // description and tag are untouched rather than resent — and a tag
+        // someone cleared elsewhere does not come back from this screen's copy.
+        await updateCircle(circle.id, { name: circle.name, isPrivate: nextPrivate }, token);
+
+        showToast(nextPrivate ? 'Circle is private now' : 'Circle is public now');
+      } catch (caught) {
+        setCircle((previous) => (previous ? { ...previous, is_private: before } : previous));
+
+        await alert({
+          title: 'Could not change who can find it',
+          message: caught instanceof Error ? caught.message : 'Please try again.',
+        });
+      } finally {
+        setSavingVisibility(false);
+      }
+    },
+    [token, circle, confirm, alert, showToast]
+  );
+
+  /**
    * What this person may do to the circle, in order of how much it costs them.
    *
    * The owner's tools first, then leaving, then taking the whole thing down.
@@ -520,7 +583,7 @@ export default function CircleScreen() {
           </Text>
         </Pressable>
 
-        {circle && (circle.tag || circle.is_private) ? (
+        {circle && (circle.tag || (circle.is_private && !circle.is_owner)) ? (
           <View className="mt-3 flex-row flex-wrap items-center gap-2">
             {circle.tag ? (
               <View
@@ -535,11 +598,11 @@ export default function CircleScreen() {
             ) : null}
 
             {/* Said on the circle's own screen and nowhere louder: the people
-                inside should know the room they are in is a closed one, and the
-                owner should be able to see the setting took without opening the
-                form again. Muted rather than accented — it is a fact about the
-                circle, not a badge it has earned. */}
-            {circle.is_private ? (
+                inside should know the room they are in is a closed one. Muted
+                rather than accented — it is a fact about the circle, not a badge
+                it has earned. The owner is told the same thing by the picker
+                below, which is why they are not told it twice here. */}
+            {circle.is_private && !circle.is_owner ? (
               <View className="flex-row items-center gap-1.5 rounded-full border border-hairline px-3.5 py-2">
                 <SymbolView
                   name={{ ios: 'lock', android: 'lock', web: 'lock' }}
@@ -558,6 +621,18 @@ export default function CircleScreen() {
           <Text className="mt-3 font-sans text-[15px] leading-[22px] text-ink">
             {circle.description}
           </Text>
+        ) : null}
+
+        {/* The owner's copy of the same fact, with the switch attached. It
+            stands in for the lock badge rather than sitting beside it: two
+            statements of one setting invite the reading that they are two
+            settings. */}
+        {circle?.is_owner ? (
+          <CircleVisibilityPicker
+            isPrivate={circle.is_private}
+            onChange={(next) => void setVisibility(next)}
+            disabled={savingVisibility}
+          />
         ) : null}
       </View>
 
