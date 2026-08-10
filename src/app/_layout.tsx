@@ -112,6 +112,9 @@ function RootNavigator() {
           back one at a time. */}
       <Stack.Screen name="forgot-password" />
       <Stack.Screen name="reset-password" />
+      {/* Reached from the sign-up checkbox. A screen rather than a browser, so
+          a half-filled form is still half filled in on the way back. */}
+      <Stack.Screen name="legal" />
       <Stack.Screen name="settings" />
       {/* Reached from your own profile, and pushed rather than presented: it is
           a place you go and come back from, not a task you finish. */}

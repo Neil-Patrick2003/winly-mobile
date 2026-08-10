@@ -40,6 +40,10 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  // Starts unticked, and has to be ticked deliberately. A box that arrives
+  // already checked is not consent, and is the first thing an App Store
+  // reviewer will fail the build over.
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   /** 422 messages from the API, keyed by its field names. */
@@ -76,8 +80,18 @@ export default function RegisterScreen() {
     usernameValid &&
     emailValid &&
     passwordValid &&
-    confirmPassword === password;
+    confirmPassword === password &&
+    termsAccepted;
   const canSubmit = formValid && !submitting && cooldown === 0;
+
+  /*
+   * Push the legal screen, opened at the document that was tapped.
+   *
+   * A screen rather than a browser: this form is half filled in, and it has to
+   * still be half filled in when they come back. `push`, so back returns here.
+   */
+  const openPolicy = (document: 'terms' | 'privacy') =>
+    router.push({ pathname: '/legal', params: { document } });
 
   // Only one message at a time, nearest problem first. The standing rule is
   // spelled out in the note below the fields, so this stays error-only.
@@ -87,6 +101,7 @@ export default function RegisterScreen() {
     serverErrors.username ??
     serverErrors.email ??
     serverErrors.password ??
+    serverErrors.terms_accepted ??
     (usernameInvalid
       ? 'Username must be 3–30 characters: lowercase letters, numbers and underscores.'
       : emailInvalid
@@ -116,7 +131,14 @@ export default function RegisterScreen() {
     setFormError(null);
 
     try {
-      await register({ fullName, username, email, password, passwordConfirmation: confirmPassword });
+      await register({
+        fullName,
+        username,
+        email,
+        password,
+        passwordConfirmation: confirmPassword,
+        termsAccepted,
+      });
       router.replace('/(tabs)/home');
     } catch (caught) {
       if (caught instanceof ApiError) {
@@ -289,6 +311,60 @@ export default function RegisterScreen() {
               : `Password must be at least ${MIN_PASSWORD_LENGTH} characters`}
           </Text>
         </View>
+
+        {/* Terms and Privacy.
+            The box is the consent; the links are how somebody reads what they
+            are consenting to, which is why they are tappable text inside the
+            sentence rather than a line of small print underneath it. The two
+            are separate targets on purpose — tapping "Terms of Service" must
+            open the terms, not silently tick the box. */}
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: termsAccepted }}
+          accessibilityLabel="I agree to the Terms of Service and Privacy Policy"
+          onPress={() => {
+            setTermsAccepted((value) => !value);
+            setFormError(null);
+          }}
+          hitSlop={6}
+          className="mt-4 flex-row items-start gap-2.5 px-1 active:opacity-70">
+          <View
+            className={`mt-0.5 h-5 w-5 items-center justify-center rounded-md border-2 ${
+              termsAccepted ? '' : 'border-hairline bg-surface-card'
+            }`}
+            style={
+              termsAccepted
+                ? { borderColor: Colors.light.primary, backgroundColor: Colors.light.primary }
+                : undefined
+            }>
+            {termsAccepted ? (
+              <SymbolView
+                name={{ ios: 'checkmark', android: 'check', web: 'check' }}
+                size={11}
+                weight="bold"
+                tintColor="#FFFFFF"
+              />
+            ) : null}
+          </View>
+
+          <Text className="flex-1 font-sans text-[13px] leading-[18px] text-ink-muted">
+            I agree to the{' '}
+            <Text
+              accessibilityRole="link"
+              onPress={() => openPolicy('terms')}
+              className="font-body-semibold text-ink underline">
+              Terms of Service
+            </Text>{' '}
+            and{' '}
+            <Text
+              accessibilityRole="link"
+              onPress={() => openPolicy('privacy')}
+              className="font-body-semibold text-ink underline">
+              Privacy Policy
+            </Text>
+            .
+          </Text>
+        </Pressable>
 
         <View className="gap-3 pt-8">
           <Pressable

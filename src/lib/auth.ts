@@ -71,6 +71,14 @@ export type RegisterInput = {
   email: string;
   password: string;
   passwordConfirmation: string;
+  /**
+   * Whether the Terms and Privacy Policy were accepted.
+   *
+   * The server rejects a registration without it, and stamps its own clock on
+   * the account rather than trusting a date sent from here — so this only ever
+   * says that the box was ticked, never when.
+   */
+  termsAccepted: boolean;
 };
 
 /**
@@ -90,6 +98,7 @@ export function registerRequest(input: RegisterInput) {
     password: input.password,
     password_confirmation: input.passwordConfirmation,
     device_name: getDeviceName(),
+    terms_accepted: input.termsAccepted,
   });
 }
 
