@@ -18,7 +18,9 @@ import {
   fetchSubCircles,
   joinCircle,
   leaveCircle,
+  postCountLabel,
   syncMyPostsToCircle,
+  syncPostsPrompt,
   updateCircle,
   type Circle,
 } from '@/lib/circles';
@@ -166,8 +168,7 @@ export default function CircleScreen() {
   /** How many of your earlier posts this circle has not seen. */
   const syncable = circle?.syncable_posts_count ?? 0;
 
-  /** "1 post" / "8 posts", which three strings here all need. */
-  const syncableLabel = `${syncable} ${syncable === 1 ? 'post' : 'posts'}`;
+  const syncableLabel = postCountLabel(syncable);
 
   /**
    * Bring them in.
@@ -175,21 +176,19 @@ export default function CircleScreen() {
    * The wall is reloaded rather than patched: the wins land in date order among
    * whatever is already there, and working out where each one belongs on the
    * client would be reimplementing the ordering the server already did.
+   *
+   * `knownCount` is for the caller that has just been told a fresher figure
+   * than this screen holds — joining answers with one, and the state set from
+   * it has not landed by the time the question is asked.
    */
-  const syncMine = useCallback(async () => {
+  const syncMine = useCallback(async (justJoined = false, knownCount?: number) => {
     if (!token || !circle || syncing) return;
 
-    const confirmed = await confirm({
-      // Says plainly that the members will be able to read them: some of these
-      // were written for other circles, and a message that implied otherwise
-      // would be the one place this could surprise somebody.
-      title: `Add your ${syncableLabel}?`,
-      message:
-        syncable === 1
-          ? `It goes on ${circle.name}'s wall, where everyone in the circle can read it. It stays wherever else you shared it.`
-          : `They go on ${circle.name}'s wall, where everyone in the circle can read them. They stay wherever else you shared them.`,
-      confirmLabel: 'Add them',
-    });
+    const total = knownCount ?? syncable;
+
+    if (total === 0) return;
+
+    const confirmed = await confirm(syncPostsPrompt(circle.name, total, justJoined));
 
     if (!confirmed) return;
 
@@ -222,7 +221,7 @@ export default function CircleScreen() {
     } finally {
       setSyncing(false);
     }
-  }, [token, circle, syncing, syncable, syncableLabel, confirm, loadPosts, showToast]);
+  }, [token, circle, syncing, syncable, confirm, loadPosts, showToast]);
 
   /**
    * Join, for somebody looking at a circle they are not in yet.
@@ -238,16 +237,37 @@ export default function CircleScreen() {
       const state = await joinCircle(circle.id, token);
       setCircle((previous) =>
         previous
-          ? { ...previous, is_member: state.is_member, members_count: state.members_count }
+          ? {
+              ...previous,
+              is_member: state.is_member,
+              members_count: state.members_count,
+              // Read from the answer rather than left as it was: the screen may
+              // have been opened before the last win was written, and the offer
+              // below is about to quote this number back.
+              syncable_posts_count: state.syncable_posts_count,
+            }
           : previous
       );
+
+      /*
+       * Offered once, on the way in.
+       *
+       * A circle joined today has none of your history on its wall, so the
+       * moment of joining is when bringing it is worth asking about — and the
+       * only moment it can be asked without interrupting something else. Saying
+       * no is not a decision to live with: the button stays on the header for
+       * as long as there is anything left to bring.
+       */
+      if (state.syncable_posts_count > 0) {
+        await syncMine(true, state.syncable_posts_count);
+      }
     } catch (caught) {
       await alert({
         title: 'Could not join that circle',
         message: caught instanceof Error ? caught.message : 'Please try again.',
       });
     }
-  }, [token, circle, alert]);
+  }, [token, circle, alert, syncMine]);
 
   /**
    * Leave, for anyone who is in it.

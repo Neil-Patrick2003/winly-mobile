@@ -182,7 +182,19 @@ export function fetchCircleMembers(
 }
 
 /** What join and leave both answer with. */
-type MembershipState = { id: string; is_member: boolean; members_count: number };
+type MembershipState = {
+  id: string;
+  is_member: boolean;
+  members_count: number;
+  /**
+   * How many of your earlier wins this circle has not seen.
+   *
+   * Sent by joining so the screen can offer to bring them in there and then.
+   * Asked later it would be asked after the person has moved on, and an offer
+   * nobody is still looking at is the same as no offer.
+   */
+  syncable_posts_count: number;
+};
 
 /** POST /api/v1/circles/{id}/membership — join. Joining twice counts once. */
 export async function joinCircle(circleId: string, token: string) {
@@ -373,6 +385,37 @@ export async function syncMyPostsToCircle(circleId: string, token: string) {
   }>(`/api/v1/circles/${circleId}/sync-my-posts`, undefined, token);
 
   return response.data;
+}
+
+/**
+ * What to ask before bringing somebody's earlier wins into a circle.
+ *
+ * Written once and shared by both places that ask — the circle's own screen and
+ * the Discover row — because the two are the same question and would otherwise
+ * be two sets of sentences drifting apart. What it must keep saying is that the
+ * circle's members will be able to read them: some were written for other
+ * circles, and a message implying otherwise is the one place this could
+ * genuinely surprise somebody.
+ *
+ * `justJoined` words it as an arrival. Asked out of nowhere, the same question
+ * reads as the app having decided something about your history unprompted.
+ */
+export function syncPostsPrompt(circleName: string, total: number, justJoined = false) {
+  const label = `${total} ${total === 1 ? 'post' : 'posts'}`;
+
+  return {
+    title: justJoined ? `Bring your ${label} with you?` : `Add your ${label}?`,
+    message:
+      total === 1
+        ? `It goes on ${circleName}'s wall, where everyone in the circle can read it. It stays wherever else you shared it.`
+        : `They go on ${circleName}'s wall, where everyone in the circle can read them. They stay wherever else you shared them.`,
+    confirmLabel: 'Add them',
+  };
+}
+
+/** "1 post" / "8 posts", which every string about them needs. */
+export function postCountLabel(total: number) {
+  return `${total} ${total === 1 ? 'post' : 'posts'}`;
 }
 
 export async function fetchSubCircles(circleId: string, token: string) {
