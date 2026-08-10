@@ -19,7 +19,12 @@ import { ImageWithPlaceholder } from '@/components/ui/image';
 import { BottomTabInset } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
-import { joinCircle, type Circle } from '@/lib/circles';
+import {
+  joinCircle,
+  syncMyPostsToCircle,
+  syncPostsPrompt,
+  type Circle,
+} from '@/lib/circles';
 import { fetchDiscover, type Discover, type SuggestedPerson } from '@/lib/discover';
 import { useConfirm } from '@/lib/confirm';
 import { useFeed } from '@/lib/feed-context';
@@ -41,6 +46,7 @@ function CircleRow({ circle, onJoined }: { circle: Circle; onJoined: (id: string
   const theme = useTheme();
   const { token } = useAuth();
   const showToast = useToast();
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
 
   const join = async () => {
@@ -48,13 +54,47 @@ function CircleRow({ circle, onJoined }: { circle: Circle; onJoined: (id: string
 
     setBusy(true);
     try {
-      await joinCircle(circle.id, token);
+      const state = await joinCircle(circle.id, token);
       onJoined(circle.id);
       showToast(`Joined ${circleLabel(circle)} 🌱`);
+
+      /*
+       * Asked here as well as on the circle's own screen, because this is where
+       * most circles are joined from — a row on a list somebody is scrolling.
+       * A circle joined today has none of your history on its wall, and the
+       * moment of joining is the only one where saying so does not interrupt
+       * something else.
+       *
+       * Saying no costs nothing: the circle's own screen keeps the button for
+       * as long as there is anything left to bring.
+       */
+      if (state.syncable_posts_count > 0) {
+        await offerSync(state.syncable_posts_count);
+      }
     } catch (caught) {
       showToast(caught instanceof Error ? caught.message : 'Could not join that circle.');
     } finally {
       setBusy(false);
+    }
+  };
+
+  /**
+   * The offer itself, kept out of `join` so a refusal or a failure here never
+   * reads as the join having gone wrong — that already happened, and said so.
+   */
+  const offerSync = async (total: number) => {
+    if (!token) return;
+
+    if (!(await confirm(syncPostsPrompt(circleLabel(circle), total, true)))) return;
+
+    try {
+      const result = await syncMyPostsToCircle(circle.id, token);
+
+      showToast(
+        result.shared === 1 ? '1 post added to this circle' : `${result.shared} posts added`
+      );
+    } catch (caught) {
+      showToast(caught instanceof Error ? caught.message : 'That did not work.');
     }
   };
 

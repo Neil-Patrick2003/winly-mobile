@@ -4,7 +4,8 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CircleName } from '@/components/circle-name';
+import { CircleName, circleLabel } from '@/components/circle-name';
+import { CircleVisibilityPicker } from '@/components/circle-visibility-picker';
 import { PostCard } from '@/components/post-card';
 import { MenuButton, type MenuItem } from '@/components/ui/menu';
 import { Colors } from '@/constants/theme';
@@ -17,7 +18,10 @@ import {
   fetchSubCircles,
   joinCircle,
   leaveCircle,
+  postCountLabel,
   syncMyPostsToCircle,
+  syncPostsPrompt,
+  updateCircle,
   type Circle,
 } from '@/lib/circles';
 import { useAlert, useConfirm } from '@/lib/confirm';
@@ -65,6 +69,7 @@ export default function CircleScreen() {
    */
   const [inner, setInner] = useState<Circle[]>([]);
   const [syncing, setSyncing] = useState(false);
+  const [savingVisibility, setSavingVisibility] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -163,8 +168,7 @@ export default function CircleScreen() {
   /** How many of your earlier posts this circle has not seen. */
   const syncable = circle?.syncable_posts_count ?? 0;
 
-  /** "1 post" / "8 posts", which three strings here all need. */
-  const syncableLabel = `${syncable} ${syncable === 1 ? 'post' : 'posts'}`;
+  const syncableLabel = postCountLabel(syncable);
 
   /**
    * Bring them in.
@@ -172,21 +176,19 @@ export default function CircleScreen() {
    * The wall is reloaded rather than patched: the wins land in date order among
    * whatever is already there, and working out where each one belongs on the
    * client would be reimplementing the ordering the server already did.
+   *
+   * `knownCount` is for the caller that has just been told a fresher figure
+   * than this screen holds — joining answers with one, and the state set from
+   * it has not landed by the time the question is asked.
    */
-  const syncMine = useCallback(async () => {
+  const syncMine = useCallback(async (justJoined = false, knownCount?: number) => {
     if (!token || !circle || syncing) return;
 
-    const confirmed = await confirm({
-      // Says plainly that the members will be able to read them: some of these
-      // were written for other circles, and a message that implied otherwise
-      // would be the one place this could surprise somebody.
-      title: `Add your ${syncableLabel}?`,
-      message:
-        syncable === 1
-          ? `It goes on ${circle.name}'s wall, where everyone in the circle can read it. It stays wherever else you shared it.`
-          : `They go on ${circle.name}'s wall, where everyone in the circle can read them. They stay wherever else you shared them.`,
-      confirmLabel: 'Add them',
-    });
+    const total = knownCount ?? syncable;
+
+    if (total === 0) return;
+
+    const confirmed = await confirm(syncPostsPrompt(circle.name, total, justJoined));
 
     if (!confirmed) return;
 
@@ -219,7 +221,7 @@ export default function CircleScreen() {
     } finally {
       setSyncing(false);
     }
-  }, [token, circle, syncing, syncable, syncableLabel, confirm, loadPosts, showToast]);
+  }, [token, circle, syncing, syncable, confirm, loadPosts, showToast]);
 
   /**
    * Join, for somebody looking at a circle they are not in yet.
@@ -235,16 +237,37 @@ export default function CircleScreen() {
       const state = await joinCircle(circle.id, token);
       setCircle((previous) =>
         previous
-          ? { ...previous, is_member: state.is_member, members_count: state.members_count }
+          ? {
+              ...previous,
+              is_member: state.is_member,
+              members_count: state.members_count,
+              // Read from the answer rather than left as it was: the screen may
+              // have been opened before the last win was written, and the offer
+              // below is about to quote this number back.
+              syncable_posts_count: state.syncable_posts_count,
+            }
           : previous
       );
+
+      /*
+       * Offered once, on the way in.
+       *
+       * A circle joined today has none of your history on its wall, so the
+       * moment of joining is when bringing it is worth asking about — and the
+       * only moment it can be asked without interrupting something else. Saying
+       * no is not a decision to live with: the button stays on the header for
+       * as long as there is anything left to bring.
+       */
+      if (state.syncable_posts_count > 0) {
+        await syncMine(true, state.syncable_posts_count);
+      }
     } catch (caught) {
       await alert({
         title: 'Could not join that circle',
         message: caught instanceof Error ? caught.message : 'Please try again.',
       });
     }
-  }, [token, circle, alert]);
+  }, [token, circle, alert, syncMine]);
 
   /**
    * Leave, for anyone who is in it.
@@ -307,6 +330,66 @@ export default function CircleScreen() {
       });
     }
   }, [confirm, token, circle, alert]);
+
+  /**
+   * Who can find the circle, answered on the circle's own screen.
+   *
+   * The owner's other tools sit behind the menu, and this one does not, because
+   * it is the setting people come back to *check* rather than to change. Stating
+   * it and being able to move it are then the same glance, where a form two taps
+   * away is a trip to find out something the screen was already in a position to
+   * say. Non-owners see the lock badge above instead, which is the same fact
+   * without the switch.
+   */
+  const setVisibility = useCallback(
+    async (nextPrivate: boolean) => {
+      if (!token || !circle || nextPrivate === circle.is_private) return;
+
+      /*
+       * Asked only on the way out into the open, exactly as the edit form asks
+       * it — going private is a step back nobody regrets, and going public puts
+       * a group that has been talking among itself in front of everybody, with
+       * every win already on its wall going too.
+       */
+      if (!nextPrivate) {
+        const confirmed = await confirm({
+          title: `Make ${circleLabel(circle)} public?`,
+          message:
+            'Anyone will be able to find it in Discover and join, and everything already shared into it comes with it.',
+          confirmLabel: 'Make public',
+          destructive: true,
+        });
+
+        if (!confirmed) return;
+      }
+
+      // Moved before the round trip so the radio answers the tap, and put back
+      // if the server refuses: a control that waits on the network to show what
+      // you just chose reads as one that missed the press.
+      const before = circle.is_private;
+      setCircle((previous) => (previous ? { ...previous, is_private: nextPrivate } : previous));
+      setSavingVisibility(true);
+
+      try {
+        // Name only alongside it. Leaving a key out means "as it was", so the
+        // description and tag are untouched rather than resent — and a tag
+        // someone cleared elsewhere does not come back from this screen's copy.
+        await updateCircle(circle.id, { name: circle.name, isPrivate: nextPrivate }, token);
+
+        showToast(nextPrivate ? 'Circle is private now' : 'Circle is public now');
+      } catch (caught) {
+        setCircle((previous) => (previous ? { ...previous, is_private: before } : previous));
+
+        await alert({
+          title: 'Could not change who can find it',
+          message: caught instanceof Error ? caught.message : 'Please try again.',
+        });
+      } finally {
+        setSavingVisibility(false);
+      }
+    },
+    [token, circle, confirm, alert, showToast]
+  );
 
   /**
    * What this person may do to the circle, in order of how much it costs them.
@@ -520,7 +603,7 @@ export default function CircleScreen() {
           </Text>
         </Pressable>
 
-        {circle && (circle.tag || circle.is_private) ? (
+        {circle && (circle.tag || (circle.is_private && !circle.is_owner)) ? (
           <View className="mt-3 flex-row flex-wrap items-center gap-2">
             {circle.tag ? (
               <View
@@ -535,11 +618,11 @@ export default function CircleScreen() {
             ) : null}
 
             {/* Said on the circle's own screen and nowhere louder: the people
-                inside should know the room they are in is a closed one, and the
-                owner should be able to see the setting took without opening the
-                form again. Muted rather than accented — it is a fact about the
-                circle, not a badge it has earned. */}
-            {circle.is_private ? (
+                inside should know the room they are in is a closed one. Muted
+                rather than accented — it is a fact about the circle, not a badge
+                it has earned. The owner is told the same thing by the picker
+                below, which is why they are not told it twice here. */}
+            {circle.is_private && !circle.is_owner ? (
               <View className="flex-row items-center gap-1.5 rounded-full border border-hairline px-3.5 py-2">
                 <SymbolView
                   name={{ ios: 'lock', android: 'lock', web: 'lock' }}
@@ -558,6 +641,18 @@ export default function CircleScreen() {
           <Text className="mt-3 font-sans text-[15px] leading-[22px] text-ink">
             {circle.description}
           </Text>
+        ) : null}
+
+        {/* The owner's copy of the same fact, with the switch attached. It
+            stands in for the lock badge rather than sitting beside it: two
+            statements of one setting invite the reading that they are two
+            settings. */}
+        {circle?.is_owner ? (
+          <CircleVisibilityPicker
+            isPrivate={circle.is_private}
+            onChange={(next) => void setVisibility(next)}
+            disabled={savingVisibility}
+          />
         ) : null}
       </View>
 

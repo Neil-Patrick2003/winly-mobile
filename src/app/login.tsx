@@ -187,8 +187,19 @@ export default function LoginScreen() {
               <Text className="font-sans text-sm leading-5 text-ink">Stay signed in</Text>
             </Pressable>
 
-            {/* Carries the typed address across, so the next screen is one tap
-                and a wait rather than the same email typed twice. */}
+            {/* Hidden until the reset email can actually arrive.
+
+                The flow itself works — the code is minted, stored and handed to
+                Brevo, which accepts it. Gmail is what drops it: the sender is
+                `app.welle@gmail.com`, and Brevo cannot authenticate a free
+                webmail domain, so the message fails DMARC alignment and never
+                reaches the inbox. Offering the button anyway sends people to a
+                screen that asks them to wait for something that is not coming,
+                which is worse than not offering it.
+
+                Put back by uncommenting, once MAIL_FROM_ADDRESS is on a domain
+                authenticated in Brevo. Nothing else here has to change.
+
             <Link href={{ pathname: '/forgot-password', params: { email: email.trim() } }} asChild>
               <Pressable accessibilityRole="button" hitSlop={6} className="px-1 active:opacity-60">
                 <Text className="font-body-semibold text-sm leading-5 text-ink">
@@ -196,6 +207,7 @@ export default function LoginScreen() {
                 </Text>
               </Pressable>
             </Link>
+            */}
           </View>
 
           {error || emailInvalid ? (
