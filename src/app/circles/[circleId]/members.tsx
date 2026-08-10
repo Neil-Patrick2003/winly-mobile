@@ -1,22 +1,15 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActionSheetIOS,
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Platform,
-  Pressable,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ImageWithPlaceholder } from '@/components/ui/image';
+import { MenuButton, type MenuItem } from '@/components/ui/menu';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
 import {
+  assignCircleOwner,
   blockMember,
   fetchBlockedMembers,
   fetchCircle,
@@ -28,7 +21,9 @@ import {
 } from '@/lib/circles';
 import type { UserSummary } from '@/lib/stories';
 import { timeAgo } from '@/lib/time';
+import { useConfirm } from '@/lib/confirm';
 import { goBack } from '@/lib/navigation';
+import { useToast } from '@/lib/toast';
 
 const AVATAR = 40;
 
@@ -61,6 +56,8 @@ export default function CircleMembersScreen() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const { token, user } = useAuth();
+  const confirm = useConfirm();
+  const showToast = useToast();
 
   const [circle, setCircle] = useState<Circle | null>(null);
   const [members, setMembers] = useState<CircleMember[]>([]);
@@ -163,65 +160,121 @@ export default function CircleMembersScreen() {
             : previous
         );
       } catch (caught) {
-        Alert.alert(
-          'That did not work',
-          caught instanceof Error ? caught.message : 'Please try again.'
-        );
+        showToast(caught instanceof Error ? caught.message : 'That did not work.');
       } finally {
         setBusyId(null);
       }
     },
-    [token, circleId]
+    [token, circleId, showToast]
   );
 
-  const confirm = useCallback(
-    (member: CircleMember, action: 'remove' | 'block') => {
+  const ask = useCallback(
+    async (member: CircleMember, action: 'remove' | 'block') => {
       const removing = action === 'remove';
 
-      Alert.alert(
-        removing ? `Remove ${member.full_name}?` : `Block ${member.full_name}?`,
-        removing
+      const confirmed = await confirm({
+        title: removing ? `Remove ${member.full_name}?` : `Block ${member.full_name}?`,
+        message: removing
           ? 'They can join again if they want to.'
           : 'They are removed and cannot rejoin or be invited back.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: removing ? 'Remove' : 'Block',
-            style: 'destructive',
-            onPress: () => void act(member, action),
-          },
-        ]
-      );
+        confirmLabel: removing ? 'Remove' : 'Block',
+        destructive: true,
+      });
+
+      if (confirmed) await act(member, action);
     },
-    [act]
+    [act, confirm]
   );
 
-  /** The owner's actions for one member. */
-  const openMenu = useCallback(
-    (member: CircleMember) => {
-      if (Platform.OS === 'ios') {
-        ActionSheetIOS.showActionSheetWithOptions(
-          {
-            title: member.full_name,
-            options: ['Cancel', 'Remove from circle', 'Block'],
-            destructiveButtonIndex: 2,
-            cancelButtonIndex: 0,
-          },
-          (index) => {
-            if (index === 1) confirm(member, 'remove');
-            if (index === 2) confirm(member, 'block');
-          }
-        );
-        return;
+  const canManage = circle?.is_owner ?? false;
+  /**
+   * Whether this screen can hand the circle to somebody.
+   *
+   * Only a circle inside another has an owner to reassign — one standing on
+   * its own answers
+   * to nobody above it, so there is nobody with standing to give it away. The
+   * server refuses either way; this only decides whether to offer it.
+   */
+  const canHandOver = canManage && (circle?.is_sub_circle ?? false);
+
+  const handOver = useCallback(
+    async (member: CircleMember) => {
+      if (!token || !circleId) return;
+
+      const confirmed = await confirm({
+        title: `Make ${member.full_name} the owner?`,
+        message: 'They will keep this circle. You can take it back at any time.',
+        confirmLabel: 'Hand over',
+      });
+
+      if (!confirmed) return;
+
+      setBusyId(member.id);
+      try {
+        const updated = await assignCircleOwner(circleId, member.id, token);
+        setCircle(updated);
+        // Reloaded rather than patched by hand: which row wears the Owner badge
+        // has moved, and that is a fact about the list rather than one row.
+        await loadMembers(true);
+        showToast(`${member.full_name} keeps this circle now`);
+      } catch (caught) {
+        showToast(caught instanceof Error ? caught.message : 'That did not work.');
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [token, circleId, confirm, loadMembers, showToast]
+  );
+
+  /**
+   * What can be done about one member.
+   *
+   * Opening a profile is the one thing anybody may do, so the menu is not the
+   * owner's alone — it used to appear only for them, which left every other
+   * reader with a row that did nothing. Removing and blocking are still theirs.
+   */
+  const menuFor = useCallback(
+    (member: CircleMember): MenuItem[] => {
+      const items: MenuItem[] = [
+        {
+          label: 'View profile',
+          icon: { ios: 'person', android: 'person', web: 'person' },
+          onPress: () =>
+            router.push({ pathname: '/users/[userId]', params: { userId: member.id } }),
+        },
+      ];
+
+      // The owner cannot be turned out of their own circle, and the server
+      // refuses it — so those two are offered only where they would work.
+      // Handing it over comes before the two that take something away: it is
+      // the ordinary thing to do with a circle you opened, and they are not.
+      if (canHandOver && !member.is_owner) {
+        items.push({
+          label: 'Make owner of this circle',
+          icon: { ios: 'crown', android: 'workspace_premium', web: 'workspace_premium' },
+          onPress: () => void handOver(member),
+        });
       }
 
-      Alert.alert(member.full_name, undefined, [
-        { text: 'Remove from circle', onPress: () => confirm(member, 'remove') },
-        { text: 'Block', style: 'destructive', onPress: () => confirm(member, 'block') },
-        { text: 'Cancel', style: 'cancel' },
-      ]);
+      if (canManage && !member.is_owner) {
+        items.push(
+          {
+            label: 'Remove from circle',
+            icon: { ios: 'person.badge.minus', android: 'person_remove', web: 'person_remove' },
+            onPress: () => void ask(member, 'remove'),
+          },
+          {
+            label: 'Block',
+            icon: { ios: 'hand.raised', android: 'block', web: 'block' },
+            destructive: true,
+            onPress: () => void ask(member, 'block'),
+          }
+        );
+      }
+
+      return items;
     },
-    [confirm]
+    [ask, canManage, canHandOver, handOver]
   );
 
   const unblock = useCallback(
@@ -233,18 +286,13 @@ export default function CircleMembersScreen() {
         await unblockMember(circleId, person.id, token);
         setBlocked((previous) => previous.filter((row) => row.id !== person.id));
       } catch (caught) {
-        Alert.alert(
-          'That did not work',
-          caught instanceof Error ? caught.message : 'Please try again.'
-        );
+        showToast(caught instanceof Error ? caught.message : 'That did not work.');
       } finally {
         setBusyId(null);
       }
     },
-    [token, circleId]
+    [token, circleId, showToast]
   );
-
-  const canManage = circle?.is_owner ?? false;
 
   return (
     <View className="flex-1 bg-surface">
@@ -301,24 +349,26 @@ export default function CircleMembersScreen() {
                 </Text>
               </View>
 
-              {/* Nothing to do to yourself, and the owner cannot be turned out
-                  of their own circle — the server refuses both. */}
-              {canManage && !item.is_owner && item.id !== user?.id ? (
+              {/* Shown against everybody but yourself: opening a profile is
+                  something any reader may do, and there is nothing useful to
+                  offer about your own row. What the menu holds beyond that
+                  depends on who is asking — see `menuFor`. */}
+              {item.id !== user?.id ? (
                 busyId === item.id ? (
                   <ActivityIndicator size="small" color={theme.textSecondary} />
                 ) : (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Manage ${item.full_name}`}
-                    onPress={() => openMenu(item)}
-                    hitSlop={8}
-                    className="p-2 active:opacity-60">
-                    <SymbolView
-                      name={{ ios: 'ellipsis', android: 'more_horiz', web: 'more_horiz' }}
-                      size={16}
-                      tintColor={theme.textSecondary}
-                    />
-                  </Pressable>
+                  <MenuButton
+                    items={menuFor(item)}
+                    // Says what the menu actually holds. "Manage" was true
+                    // while the owner was the only one who saw it.
+                    accessibilityLabel={
+                      canManage && !item.is_owner
+                        ? `Manage ${item.full_name}`
+                        : `Options for ${item.full_name}`
+                    }
+                    tintColor={theme.textSecondary}
+                    className="p-2 active:opacity-60"
+                  />
                 )
               ) : null}
             </View>

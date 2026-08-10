@@ -56,7 +56,9 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "deploy:staging": "rm -rf dist && eas env:exec preview \"npx expo export --platform web --clear\" && eas deploy --alias staging",
+    "deploy:prod": "rm -rf dist && eas env:exec production \"npx expo export --platform web --clear\" && eas deploy --prod"
   },
   "private": true
 }

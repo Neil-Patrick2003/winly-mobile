@@ -1,4 +1,4 @@
-import { Link, router } from 'expo-router';
+import { Link, router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useEffect, useState } from 'react';
 import {
@@ -17,24 +17,26 @@ import { Field } from '@/components/ui/field';
 import { Wordmark } from '@/components/wordmark';
 import { Colors } from '@/constants/theme';
 import { ApiError } from '@/lib/api';
-import { useAuth } from '@/lib/auth-context';
+import { requestPasswordResetCode } from '@/lib/auth';
 import { goBack } from '@/lib/navigation';
 
 /**
- * Sign-in. Pinned to the light palette so arriving from the welcome screen —
- * which commits to light because its artwork is fixed light — does not flash a
- * dark screen on a dark-scheme device.
+ * Step one of a forgotten password: say which account.
  *
- * Submits to `POST /api/v1/login`, which returns a Sanctum token for this
- * device. Each successful call mints an additional token — it does not replace
- * the one issued at sign-up.
+ * `POST /api/v1/forgot-password` answers the same 200 whether or not that
+ * address has an account — so this cannot report "no account with that email",
+ * and must not try. It moves on to the code screen either way, which is also
+ * the truthful thing to do: if nothing is there, nothing arrives, and the
+ * person finds that out from their own inbox rather than from us confirming
+ * which addresses are registered.
  */
-export default function LoginScreen() {
+export default function ForgotPasswordScreen() {
   const insets = useSafeAreaInsets();
-  const { login } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [remember, setRemember] = useState(true);
+  // Prefilled from whatever was typed on the sign-in screen, which is usually
+  // the address in question — someone reaches for this link after an attempt
+  // that did not work, not before one.
+  const params = useLocalSearchParams<{ email?: string }>();
+  const [email, setEmail] = useState(params.email ?? '');
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,17 +51,7 @@ export default function LoginScreen() {
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const emailInvalid = email.trim().length > 0 && !emailValid;
-
-  // Sign-in checks the address is well formed and that a password was typed,
-  // nothing more. Strength rules belong on sign-up — applying them here would
-  // lock out anyone whose existing password predates the current rule.
-  const formValid = emailValid && password.length > 0;
-  const canSubmit = formValid && !submitting && cooldown === 0;
-
-  const edit = (setValue: (value: string) => void) => (value: string) => {
-    setValue(value);
-    setError(null);
-  };
+  const canSubmit = emailValid && !submitting && cooldown === 0;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -68,13 +60,12 @@ export default function LoginScreen() {
     setError(null);
 
     try {
-      await login({ email, password }, remember);
-      router.replace('/(tabs)/home');
+      await requestPasswordResetCode(email);
+      // `push`, not `replace`: the code screen's back button should come back
+      // here, so a typo in the address can be corrected without starting over.
+      router.push({ pathname: '/reset-password', params: { email: email.trim() } });
     } catch (caught) {
       if (caught instanceof ApiError) {
-        // Wrong password, unknown email and deleted account all arrive as the
-        // same message under `email`. Showing it verbatim is the point — do not
-        // try to narrow it down.
         setError(caught.fieldErrors.email ?? caught.message);
         if (caught.retryAfterSeconds) setCooldown(caught.retryAfterSeconds);
       } else {
@@ -103,7 +94,7 @@ export default function LoginScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Go back"
-          onPress={() => goBack('/')}
+          onPress={() => goBack('/login')}
           className="-ml-2 mt-2 self-start p-2 active:opacity-60">
           <SymbolView
             name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }}
@@ -118,19 +109,24 @@ export default function LoginScreen() {
         </View>
 
         <View className="gap-1 pt-6">
-          <Text className="font-heading-bold text-2xl leading-8 text-ink">Welcome back</Text>
+          <Text className="font-heading-bold text-2xl leading-8 text-ink">
+            Forgot your password?
+          </Text>
           <Text className="font-sans text-sm leading-5 text-ink-muted">
-            Pick up where you left off and keep the streak going.
+            Tell us the email you signed up with and we&rsquo;ll send you a six-digit code to get
+            back in.
           </Text>
         </View>
 
         <View className="gap-2.5 pt-6">
-          {/* Email only — the API does not accept a username here. */}
           <Field
             icon={{ ios: 'envelope', android: 'mail', web: 'mail' }}
             placeholder="Email address"
             value={email}
-            onChangeText={edit(setEmail)}
+            onChangeText={(value) => {
+              setEmail(value);
+              setError(null);
+            }}
             invalid={emailInvalid || Boolean(error)}
             maxLength={255}
             keyboardType="email-address"
@@ -138,65 +134,9 @@ export default function LoginScreen() {
             autoCorrect={false}
             autoComplete="email"
             textContentType="emailAddress"
-            returnKeyType="next"
-          />
-          <Field
-            icon={{ ios: 'lock', android: 'lock', web: 'lock' }}
-            placeholder="Password"
-            value={password}
-            onChangeText={edit(setPassword)}
-            invalid={Boolean(error)}
-            secureTextEntry
-            autoCapitalize="none"
-            autoComplete="current-password"
-            textContentType="password"
-            returnKeyType="done"
+            returnKeyType="send"
             onSubmitEditing={handleSubmit}
           />
-
-          <View className="flex-row items-center justify-between pt-1">
-            {/* On by default, which is what the app already did before there was
-                a choice about it. Clearing it keeps the session in memory only:
-                it lasts until the app is closed, and this device is not left
-                holding a credential afterwards. */}
-            <Pressable
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: remember }}
-              accessibilityLabel="Stay signed in on this device"
-              onPress={() => setRemember((value) => !value)}
-              hitSlop={6}
-              className="flex-row items-center gap-2.5 px-1 active:opacity-70">
-              <View
-                className={`h-5 w-5 items-center justify-center rounded-md border-2 ${
-                  remember ? '' : 'border-hairline bg-surface-card'
-                }`}
-                style={
-                  remember
-                    ? { borderColor: Colors.light.primary, backgroundColor: Colors.light.primary }
-                    : undefined
-                }>
-                {remember ? (
-                  <SymbolView
-                    name={{ ios: 'checkmark', android: 'check', web: 'check' }}
-                    size={11}
-                    weight="bold"
-                    tintColor="#FFFFFF"
-                  />
-                ) : null}
-              </View>
-              <Text className="font-sans text-sm leading-5 text-ink">Stay signed in</Text>
-            </Pressable>
-
-            {/* Carries the typed address across, so the next screen is one tap
-                and a wait rather than the same email typed twice. */}
-            <Link href={{ pathname: '/forgot-password', params: { email: email.trim() } }} asChild>
-              <Pressable accessibilityRole="button" hitSlop={6} className="px-1 active:opacity-60">
-                <Text className="font-body-semibold text-sm leading-5 text-ink">
-                  Forgot password?
-                </Text>
-              </Pressable>
-            </Link>
-          </View>
 
           {error || emailInvalid ? (
             <Text className="px-4 font-sans text-xs leading-4 text-highlight">
@@ -219,25 +159,23 @@ export default function LoginScreen() {
               {submitting ? <ActivityIndicator size="small" color="#ffffff" /> : null}
               <Text className="font-body-semibold text-base leading-6 text-white">
                 {submitting
-                  ? 'Logging in…'
+                  ? 'Sending code…'
                   : cooldown > 0
                     ? `Try again in ${cooldown}s`
-                    : 'Log In'}
+                    : 'Send code'}
               </Text>
             </View>
           </Pressable>
 
           <View className="flex-row items-center justify-center gap-1">
             <Text className="font-sans text-sm leading-5 text-ink-muted">
-              New to Welle?
+              Remembered it after all?
             </Text>
-            {/* `replace`, so the two auth screens trade places instead of
-                stacking up each time you bounce between them. */}
-            <Link href="/register" replace asChild>
+            {/* `replace`, so this screen does not sit under sign-in waiting to
+                be returned to by a back gesture. */}
+            <Link href="/login" replace asChild>
               <Pressable accessibilityRole="button" className="active:opacity-60">
-                <Text className="font-body-semibold text-sm leading-5 text-ink">
-                  Create an account
-                </Text>
+                <Text className="font-body-semibold text-sm leading-5 text-ink">Log In</Text>
               </Pressable>
             </Link>
           </View>

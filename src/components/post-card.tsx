@@ -13,6 +13,8 @@ import {
 
 import { PILLAR_THEME } from '@/components/entry-chrome';
 import { ImageWithPlaceholder } from '@/components/ui/image';
+import { Lightbox, type LightboxItem } from '@/components/ui/lightbox';
+import { CircleName, circleLabel } from '@/components/circle-name';
 import { MenuButton, type MenuItem } from '@/components/ui/menu';
 import { Colors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -43,52 +45,102 @@ import { useToast } from '@/lib/toast';
  * button. `tint` colours both glyph and number when the action is on, which is
  * what carries the state; the icon is expected to change shape too, since
  * colour alone is not a signal everyone can read.
+ *
+ * `onValuePress` splits the counter in two, because the like counter is really
+ * two questions: the heart is "do I like this", and the number beside it is
+ * "who else did". Given only `onPress` the whole thing stays one target, which
+ * is what the comment counter wants and what the like counter falls back to
+ * while nobody has liked it yet.
  */
 function Count({
   icon,
   value,
   label,
   actionLabel,
+  valueLabel,
   tint,
   onPress,
+  onValuePress,
 }: {
   icon: SymbolViewProps['name'];
   value: number;
   label: string;
   /** What the press does, for a screen reader. Required to make it pressable. */
   actionLabel?: string;
+  /** The same, for the number. Required to make the number pressable. */
+  valueLabel?: string;
   tint?: string;
   onPress?: () => void;
+  onValuePress?: () => void;
 }) {
-  const body = (
-    <>
-      <SymbolView name={icon} size={16} tintColor={tint ?? Colors.light.textSecondary} />
-      <Text
-        className="font-sans text-[13px] leading-[18px] text-ink-muted"
-        style={tint ? { color: tint } : undefined}>
-        {value}
-      </Text>
-    </>
+  const glyph = <SymbolView name={icon} size={16} tintColor={tint ?? Colors.light.textSecondary} />;
+
+  const number = (
+    <Text
+      className="font-sans text-[13px] leading-[18px] text-ink-muted"
+      style={tint ? { color: tint } : undefined}>
+      {value}
+    </Text>
   );
 
-  if (!onPress) {
+  if (!onPress && !onValuePress) {
     return (
       <View accessibilityLabel={`${value} ${label}`} className="flex-row items-center gap-1.5">
-        {body}
+        {glyph}
+        {number}
       </View>
     );
   }
 
+  // The undivided counter: one press, one meaning, the whole row to hit.
+  if (!onValuePress) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${actionLabel} — ${value} ${label}`}
+        accessibilityState={{ selected: Boolean(tint) }}
+        onPress={onPress}
+        hitSlop={8}
+        className="flex-row items-center gap-1.5 active:opacity-60">
+        {glyph}
+        {number}
+      </Pressable>
+    );
+  }
+
+  /*
+   * Two targets, and the hit slops are asymmetric on purpose.
+   *
+   * They sit six points apart, so a pair of even slops would overlap in the
+   * gap and hand whichever press landed there to whichever view happened to be
+   * drawn on top — liking a post when the intent was to see who else had.
+   * Each keeps its generous edge on the outside and stops short in the middle.
+   */
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${actionLabel} — ${value} ${label}`}
-      accessibilityState={{ selected: Boolean(tint) }}
-      onPress={onPress}
-      hitSlop={8}
-      className="flex-row items-center gap-1.5 active:opacity-60">
-      {body}
-    </Pressable>
+    <View className="flex-row items-center gap-1.5">
+      {onPress ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${actionLabel} — ${value} ${label}`}
+          accessibilityState={{ selected: Boolean(tint) }}
+          onPress={onPress}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 3 }}
+          className="active:opacity-60">
+          {glyph}
+        </Pressable>
+      ) : (
+        glyph
+      )}
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${valueLabel} — ${value} ${label}`}
+        onPress={onValuePress}
+        hitSlop={{ top: 10, bottom: 10, left: 3, right: 10 }}
+        className="active:opacity-60">
+        {number}
+      </Pressable>
+    </View>
   );
 }
 
@@ -156,7 +208,7 @@ const clampRatio = (width: number, height: number) =>
  * `cover` instead of setting one of its own. A lone attachment therefore always
  * gets its true shape, which is the common case.
  */
-function MediaGrid({ media }: { media: Media[] }) {
+function MediaGrid({ media, onOpen }: { media: Media[]; onOpen: (index: number) => void }) {
   const shown = media.slice(0, MAX_TILES);
   const hidden = media.length - shown.length;
   const [ratio, setRatio] = useState(DEFAULT_RATIO);
@@ -167,20 +219,32 @@ function MediaGrid({ media }: { media: Media[] }) {
         const more = index === shown.length - 1 && hidden > 0;
 
         return (
-          <View
+          <Pressable
             key={item.id}
+            accessibilityRole="button"
+            accessibilityLabel={
+              more
+                ? `View photo, and ${hidden} more, full screen`
+                : item.kind === 'video'
+                  ? 'View video full screen'
+                  : 'View photo full screen'
+            }
+            // The card body underneath opens the post, and on the web a press
+            // that is not stopped reaches it as well as this — so tapping a
+            // photo would both open it and navigate away from it. Native gives
+            // the touch to the innermost responder and never propagates, which
+            // is why this only matters in a browser.
+            onPress={(event) => {
+              event.stopPropagation();
+              onOpen(index);
+            }}
             style={{ aspectRatio: ratio }}
-            className={`overflow-hidden rounded-2xl ${shown.length === 1 ? 'w-full' : 'w-[48.5%]'}`}>
+            className={`overflow-hidden rounded-2xl active:opacity-90 ${
+              shown.length === 1 ? 'w-full' : 'w-[48.5%]'
+            }`}>
             <ImageWithPlaceholder
               source={{ uri: item.url }}
               className="h-full w-full"
-              accessibilityLabel={
-                more
-                  ? `Attached photo, and ${hidden} more`
-                  : item.kind === 'video'
-                    ? 'Attached video'
-                    : 'Attached photo'
-              }
               // Only the first tile is asked: it is the one the shared ratio
               // comes from, and letting the second overwrite it would reshape
               // the row depending on which image happened to load last.
@@ -210,7 +274,7 @@ function MediaGrid({ media }: { media: Media[] }) {
                 <Text className="font-heading-bold text-2xl leading-8 text-white">+{hidden}</Text>
               </View>
             ) : null}
-          </View>
+          </Pressable>
         );
       })}
     </View>
@@ -226,29 +290,51 @@ function MediaGrid({ media }: { media: Media[] }) {
  * shape here either — each image measures itself, so a portrait and a
  * landscape shot both keep theirs.
  */
-function MediaStack({ media }: { media: Media[] }) {
+function MediaStack({ media, onOpen }: { media: Media[]; onOpen: (index: number) => void }) {
   // `-mx-4` cancels the detail block's own padding, so photos run edge to edge
   // while the words around them stay inset.
   return (
     <View className="-mx-4 mt-3 gap-1">
       {media.map((item, index) => (
-        <StackedTile key={item.id} item={item} position={index + 1} total={media.length} />
+        <StackedTile
+          key={item.id}
+          item={item}
+          position={index + 1}
+          total={media.length}
+          onPress={() => onOpen(index)}
+        />
       ))}
     </View>
   );
 }
 
-function StackedTile({ item, position, total }: { item: Media; position: number; total: number }) {
+function StackedTile({
+  item,
+  position,
+  total,
+  onPress,
+}: {
+  item: Media;
+  position: number;
+  total: number;
+  onPress: () => void;
+}) {
   // Its own, not shared: a stack has no row to keep aligned.
   const [ratio, setRatio] = useState(DEFAULT_RATIO);
 
   return (
-    <View style={{ aspectRatio: ratio }} className="w-full overflow-hidden">
+    <Pressable
+      accessibilityRole="button"
+      // Still cropped here — the stack keeps the column tidy — so what the
+      // press offers is the part of the photo this tile is cutting off.
+      accessibilityLabel={`View ${item.kind === 'video' ? 'video' : 'photo'} ${position} of ${total} full screen`}
+      onPress={onPress}
+      style={{ aspectRatio: ratio }}
+      className="w-full overflow-hidden active:opacity-90">
       <ImageWithPlaceholder
         source={{ uri: item.url }}
         className="h-full w-full"
         contentFit="cover"
-        accessibilityLabel={`${item.kind === 'video' ? 'Attached video' : 'Attached photo'} ${position} of ${total}`}
         onLoad={({ source }) => setRatio(clampRatio(source.width, source.height))}
       />
 
@@ -261,7 +347,7 @@ function StackedTile({ item, position, total }: { item: Media; position: number;
           />
         </View>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 
@@ -537,6 +623,15 @@ export function PostCard({
   const [sending, setSending] = useState(false);
 
   /*
+   * Which attachment is being looked at full screen, or null for none.
+   *
+   * The viewer is mounted only while it is open, so the tile that was tapped
+   * is simply where it starts — see `Lightbox` for why that is worth more than
+   * keeping it mounted behind a flag.
+   */
+  const [viewing, setViewing] = useState<number | null>(null);
+
+  /*
    * The counters as drawn: what this reader has done to the post, falling back
    * to what the list it came from reported.
    *
@@ -754,9 +849,27 @@ export function PostCard({
   // `position` is what orders them, not the win they came from.
   const media = wins.flatMap((win) => win.media).sort((a, b) => a.position - b.position);
 
+  /*
+   * The whole set, whatever the card itself is drawing.
+   *
+   * The feed caps its grid at two tiles and counts the rest under a "+3", but
+   * the viewer opened from that third tile has to hold everything — the count
+   * is a promise that the others are in there.
+   */
+  const viewable: LightboxItem[] = media.map((item, at) => ({
+    id: item.id,
+    url: item.url,
+    kind: item.kind,
+    label: `${item.kind === 'video' ? 'Video' : 'Photo'} ${at + 1} of ${media.length}`,
+  }));
+
   /** Open this post on its own screen, where the whole thread lives. */
   const openPost = () =>
     router.push({ pathname: '/comments/[postId]', params: { postId: post.id } });
+
+  /** Who else liked it. Nothing to open while nobody has. */
+  const openLikes = () =>
+    router.push({ pathname: '/posts/[postId]/likes', params: { postId: post.id } });
 
   // Below every hook, so this stays a plain early return rather than a
   // conditional hook. A deleted post leaves no gap in whatever list it was in.
@@ -830,8 +943,8 @@ export function PostCard({
                   accessibilityRole="button"
                   accessibilityLabel={
                     circles.length === 1
-                      ? `Shared in ${circles[0].name}. Open circle.`
-                      : `Shared in ${circles[0].name} and ${circles.length - 1} more. Open circle.`
+                      ? `Shared in ${circleLabel(circles[0])}. Open circle.`
+                      : `Shared in ${circleLabel(circles[0])} and ${circles.length - 1} more. Open circle.`
                   }
                   onPress={() =>
                     router.push({
@@ -848,11 +961,13 @@ export function PostCard({
                       {(circles[0].icon_initial.trim()[0] ?? '?').toUpperCase()}
                     </Text>
                   </View>
-                  <Text
+                  {/* Already muted, so the parent needs no second dimming. */}
+                  <CircleName
+                    circle={circles[0]}
                     numberOfLines={1}
-                    className="shrink font-body-semibold text-[13px] leading-[18px] text-ink-muted">
-                    {circles[0].name}
-                  </Text>
+                    className="shrink font-body-semibold text-[13px] leading-[18px] text-ink-muted"
+                    parentClassName="font-sans"
+                  />
                   {/* Named one and counted the rest: ten chips would bury the
                       author's own name above them. */}
                   {circles.length > 1 ? (
@@ -906,9 +1021,9 @@ export function PostCard({
 
         {media.length > 0 ? (
           detail ? (
-            <MediaStack media={media} />
+            <MediaStack media={media} onOpen={setViewing} />
           ) : (
-            <MediaGrid media={media} />
+            <MediaGrid media={media} onOpen={setViewing} />
           )
         ) : null}
       </PostBody>
@@ -921,6 +1036,11 @@ export function PostCard({
           actionLabel={liked ? 'Unlike' : 'Like'}
           tint={liked ? theme.highlight : undefined}
           onPress={() => void onLike()}
+          // Only once there is somebody to name. At zero the counter stays a
+          // single target, which is the larger one — and a list that opened on
+          // "Nobody yet" would be a worse answer than not offering it.
+          valueLabel={likes > 0 ? 'See who liked this' : undefined}
+          onValuePress={likes > 0 ? openLikes : undefined}
         />
         <Count
           icon={{
@@ -974,6 +1094,15 @@ export function PostCard({
             )}
           </Pressable>
         </View>
+      ) : null}
+
+      {viewing !== null ? (
+        <Lightbox
+          items={viewable}
+          startIndex={viewing}
+          title={`${displayName}'s post`}
+          onClose={() => setViewing(null)}
+        />
       ) : null}
     </View>
   );

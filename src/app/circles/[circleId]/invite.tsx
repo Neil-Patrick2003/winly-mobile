@@ -1,13 +1,14 @@
 import { useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ImageWithPlaceholder } from '@/components/ui/image';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
 import { fetchInvitableFriends, inviteToCircle, type InvitableFriend } from '@/lib/circles';
+import { useAlert } from '@/lib/confirm';
 import { goBack } from '@/lib/navigation';
 
 const AVATAR = 40;
@@ -37,6 +38,7 @@ export default function InviteToCircleScreen() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const { token } = useAuth();
+  const alert = useAlert();
 
   const [friends, setFriends] = useState<InvitableFriend[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,15 +119,15 @@ export default function InviteToCircleScreen() {
           )
         );
       } catch (caught) {
-        Alert.alert(
-          'Could not send that invitation',
-          caught instanceof Error ? caught.message : 'Please try again.'
-        );
+        await alert({
+          title: 'Could not send that invitation',
+          message: caught instanceof Error ? caught.message : 'Please try again.',
+        });
       } finally {
         setBusyId(null);
       }
     },
-    [token, circleId]
+    [token, circleId, alert]
   );
 
   return (

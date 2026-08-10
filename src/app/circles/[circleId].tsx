@@ -1,9 +1,10 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CircleName } from '@/components/circle-name';
 import { PostCard } from '@/components/post-card';
 import { MenuButton, type MenuItem } from '@/components/ui/menu';
 import { Colors } from '@/constants/theme';
@@ -13,11 +14,13 @@ import {
   deleteCircle,
   fetchCircle,
   fetchCirclePosts,
+  fetchSubCircles,
   joinCircle,
   leaveCircle,
+  syncMyPostsToCircle,
   type Circle,
 } from '@/lib/circles';
-import { useConfirm } from '@/lib/confirm';
+import { useAlert, useConfirm } from '@/lib/confirm';
 import { useFeed } from '@/lib/feed-context';
 import type { Post } from '@/lib/posts';
 import { goBack } from '@/lib/navigation';
@@ -49,8 +52,19 @@ export default function CircleScreen() {
   const { adoptSavedState } = useFeed();
   const showToast = useToast();
   const confirm = useConfirm();
+  const alert = useAlert();
 
   const [circle, setCircle] = useState<Circle | null>(null);
+  /**
+   * The circles inside this one.
+   *
+   * Loaded alongside it rather than on its own screen: what a circle contains
+   * is part of what it is, and hiding them behind a tap would leave most of
+   * them never found. Empty for a circle with none, and for one that is itself
+   * inside another — they do not nest.
+   */
+  const [inner, setInner] = useState<Circle[]>([]);
+  const [syncing, setSyncing] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -109,6 +123,16 @@ export default function CircleScreen() {
       const [found] = await Promise.all([fetchCircle(circleId, token), loadPosts(true)]);
       setCircle(found);
       setError(null);
+
+      /*
+       * Asked for separately, and allowed to fail quietly.
+       *
+       * A circle whose inner circles could not be listed is still one worth
+       * showing — the wall below is the point of the screen, and an error over
+       * the whole page because one extra list did not arrive would be the
+       * lesser thing breaking the greater.
+       */
+      setInner(found.is_sub_circle ? [] : await fetchSubCircles(circleId, token).catch(() => []));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not load this circle.');
     }
@@ -136,6 +160,67 @@ export default function CircleScreen() {
     setLoadingMore(false);
   }, [loadPosts]);
 
+  /** How many of your earlier posts this circle has not seen. */
+  const syncable = circle?.syncable_posts_count ?? 0;
+
+  /** "1 post" / "8 posts", which three strings here all need. */
+  const syncableLabel = `${syncable} ${syncable === 1 ? 'post' : 'posts'}`;
+
+  /**
+   * Bring them in.
+   *
+   * The wall is reloaded rather than patched: the wins land in date order among
+   * whatever is already there, and working out where each one belongs on the
+   * client would be reimplementing the ordering the server already did.
+   */
+  const syncMine = useCallback(async () => {
+    if (!token || !circle || syncing) return;
+
+    const confirmed = await confirm({
+      // Says plainly that the members will be able to read them: some of these
+      // were written for other circles, and a message that implied otherwise
+      // would be the one place this could surprise somebody.
+      title: `Add your ${syncableLabel}?`,
+      message:
+        syncable === 1
+          ? `It goes on ${circle.name}'s wall, where everyone in the circle can read it. It stays wherever else you shared it.`
+          : `They go on ${circle.name}'s wall, where everyone in the circle can read them. They stay wherever else you shared them.`,
+      confirmLabel: 'Add them',
+    });
+
+    if (!confirmed) return;
+
+    setSyncing(true);
+    try {
+      const result = await syncMyPostsToCircle(circle.id, token);
+
+      setCircle((previous) =>
+        previous
+          ? {
+              ...previous,
+              syncable_posts_count: result.syncable_posts_count,
+              // The header counts what is on the wall, and the wall just grew.
+              // Left alone it would keep the figure from before the press until
+              // the screen was left and come back to.
+              posts_count:
+                previous.posts_count === undefined
+                  ? undefined
+                  : previous.posts_count + result.shared,
+            }
+          : previous
+      );
+      await loadPosts(true);
+
+      showToast(
+        result.shared === 1 ? '1 post added to this circle' : `${result.shared} posts added`
+      );
+    } catch (caught) {
+      showToast(caught instanceof Error ? caught.message : 'That did not work.');
+    } finally {
+      setSyncing(false);
+    }
+  }, [token, circle, syncing, syncable, syncableLabel, confirm, loadPosts, showToast]);
+
   /**
    * Join, for somebody looking at a circle they are not in yet.
    *
@@ -154,12 +239,12 @@ export default function CircleScreen() {
           : previous
       );
     } catch (caught) {
-      Alert.alert(
-        'Could not join that circle',
-        caught instanceof Error ? caught.message : 'Please try again.'
-      );
+      await alert({
+        title: 'Could not join that circle',
+        message: caught instanceof Error ? caught.message : 'Please try again.',
+      });
     }
-  }, [token, circle]);
+  }, [token, circle, alert]);
 
   /**
    * Leave, for anyone who is in it.
@@ -193,12 +278,12 @@ export default function CircleScreen() {
       );
       showToast(`Left ${circle.name}`);
     } catch (caught) {
-      Alert.alert(
-        'Could not leave that circle',
-        caught instanceof Error ? caught.message : 'Please try again.'
-      );
+      await alert({
+        title: 'Could not leave that circle',
+        message: caught instanceof Error ? caught.message : 'Please try again.',
+      });
     }
-  }, [confirm, token, circle, showToast]);
+  }, [confirm, token, circle, showToast, alert]);
 
   const remove = useCallback(async () => {
     if (!token || !circle) return;
@@ -216,12 +301,12 @@ export default function CircleScreen() {
       await deleteCircle(circle.id, token);
       goBack('/(tabs)/circles');
     } catch (caught) {
-      Alert.alert(
-        'Could not delete that circle',
-        caught instanceof Error ? caught.message : 'Please try again.'
-      );
+      await alert({
+        title: 'Could not delete that circle',
+        message: caught instanceof Error ? caught.message : 'Please try again.',
+      });
     }
-  }, [confirm, token, circle]);
+  }, [confirm, token, circle, alert]);
 
   /**
    * What this person may do to the circle, in order of how much it costs them.
@@ -316,18 +401,61 @@ export default function CircleScreen() {
             at one from outside gets the way in instead. */}
         {circle ? (
           circle.is_member ? (
-            <View
-              className="mb-1 flex-row items-center gap-1.5 rounded-full border px-4 py-2"
-              style={{ borderColor: accent }}>
-              <Text className="font-body-semibold text-[14px] leading-5" style={{ color: accent }}>
-                Joined
-              </Text>
-              <SymbolView
-                name={{ ios: 'checkmark', android: 'check', web: 'check' }}
-                size={12}
-                weight="bold"
-                tintColor={accent}
-              />
+            <View className="mb-1 flex-row items-center gap-2">
+              {/* Beside Joined, and only while there is something to bring.
+                  A post goes to the circles you were in when you wrote it, so a
+                  circle joined today has none of your history — the wall says
+                  somebody who has posted for months has never shared a thing.
+                  This is how that gets filled in. */}
+              {syncable > 0 ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Share your earlier ${syncableLabel} into ${circle.name}`}
+                  accessibilityState={{ busy: syncing }}
+                  disabled={syncing}
+                  onPress={() => void syncMine()}
+                  // Allowed to shrink, and Joined is not: a three-figure count
+                  // would otherwise push the badge past the edge of the screen.
+                  className="shrink flex-row items-center gap-1.5 rounded-full px-3.5 py-2 active:opacity-85"
+                  style={{ backgroundColor: `${accent}1F` }}>
+                  {syncing ? (
+                    <ActivityIndicator size="small" color={accent} />
+                  ) : (
+                    <SymbolView
+                      name={{
+                        ios: 'arrow.triangle.2.circlepath',
+                        android: 'sync',
+                        web: 'sync',
+                      }}
+                      size={12}
+                      weight="bold"
+                      tintColor={accent}
+                    />
+                  )}
+                  <Text
+                    numberOfLines={1}
+                    className="shrink font-body-semibold text-[13px] leading-[18px]"
+                    style={{ color: accent }}>
+                    {syncing ? 'Sharing…' : `Add my ${syncableLabel}`}
+                  </Text>
+                </Pressable>
+              ) : null}
+
+              <View
+                className="flex-row items-center gap-1.5 rounded-full border px-4 py-2"
+                style={{ borderColor: accent }}>
+                <Text
+                  className="font-body-semibold text-[14px] leading-5"
+                  style={{ color: accent }}>
+                  Joined
+                </Text>
+                <SymbolView
+                  name={{ ios: 'checkmark', android: 'check', web: 'check' }}
+                  size={12}
+                  weight="bold"
+                  tintColor={accent}
+                />
+              </View>
             </View>
           ) : (
             <Pressable
@@ -357,9 +485,13 @@ export default function CircleScreen() {
               tintColor={theme.textSecondary}
             />
           </Pressable>
-          <Text numberOfLines={1} className="flex-1 font-heading-bold text-2xl leading-8 text-ink">
-            {circle?.name ?? ''}
-          </Text>
+          {/* Named the same here as in every list and chip — see CircleName. */}
+          <CircleName
+            circle={circle ?? { name: '' }}
+            numberOfLines={1}
+            className="flex-1 font-heading-bold text-2xl leading-8 text-ink"
+            parentClassName="font-sans text-xl text-ink-muted"
+          />
         </View>
 
         {/* The counts are the way in to the member list, for everyone — the
@@ -381,17 +513,44 @@ export default function CircleScreen() {
             {members === 1 ? '1 member' : `${members} members`}
             {/* Absent rather than zero where the server did not count, so a
                 missing figure never reads as an empty circle. */}
-            {shared === undefined ? '' : ` · ${shared === 1 ? '1 win' : `${shared} wins`}`}
+            {/* Posts, not wins: this counts what is on the wall, and each one
+                of those carries a win or three inside it. The circles tab has
+                always called the same figure posts. */}
+            {shared === undefined ? '' : ` · ${shared === 1 ? '1 post' : `${shared} posts`}`}
           </Text>
         </Pressable>
 
-        {circle?.tag ? (
-          <View
-            className="mt-3 self-start rounded-full px-3.5 py-2"
-            style={{ backgroundColor: `${accent}1F` }}>
-            <Text className="font-body-semibold text-[13px] leading-[18px]" style={{ color: accent }}>
-              {circle.tag}
-            </Text>
+        {circle && (circle.tag || circle.is_private) ? (
+          <View className="mt-3 flex-row flex-wrap items-center gap-2">
+            {circle.tag ? (
+              <View
+                className="rounded-full px-3.5 py-2"
+                style={{ backgroundColor: `${accent}1F` }}>
+                <Text
+                  className="font-body-semibold text-[13px] leading-[18px]"
+                  style={{ color: accent }}>
+                  {circle.tag}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Said on the circle's own screen and nowhere louder: the people
+                inside should know the room they are in is a closed one, and the
+                owner should be able to see the setting took without opening the
+                form again. Muted rather than accented — it is a fact about the
+                circle, not a badge it has earned. */}
+            {circle.is_private ? (
+              <View className="flex-row items-center gap-1.5 rounded-full border border-hairline px-3.5 py-2">
+                <SymbolView
+                  name={{ ios: 'lock', android: 'lock', web: 'lock' }}
+                  size={12}
+                  tintColor={theme.textSecondary}
+                />
+                <Text className="font-body-semibold text-[13px] leading-[18px] text-ink-muted">
+                  Private
+                </Text>
+              </View>
+            ) : null}
           </View>
         ) : null}
 
@@ -401,6 +560,64 @@ export default function CircleScreen() {
           </Text>
         ) : null}
       </View>
+
+      {/* The circles inside this one.
+          Listed and never created here: opening one decides who can read a
+          group's wins, and that is done from the website on the owner's manage
+          page. Shown to everybody who can see the parent, because knowing a
+          circle has smaller circles in it is part of what it is. */}
+      {circle && !circle.is_sub_circle && inner.length > 0 ? (
+        <View className="mt-5 border-t border-hairline px-6 pt-5">
+          <Text className="font-heading-bold text-lg leading-6 text-ink">Circles inside</Text>
+
+          <View className="mt-3 gap-2">
+            {inner.map((sub) => (
+              <Pressable
+                key={sub.id}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${sub.name}`}
+                onPress={() =>
+                  router.push({ pathname: '/circles/[circleId]', params: { circleId: sub.id } })
+                }
+                className="flex-row items-center gap-3 rounded-2xl bg-surface-card px-4 py-3 active:opacity-70">
+                <View
+                  className="h-9 w-9 items-center justify-center rounded-xl"
+                  style={{ backgroundColor: sub.color_hex }}>
+                  <Text className="font-heading-bold text-[15px] leading-5 text-white">
+                    {sub.icon_initial}
+                  </Text>
+                </View>
+
+                <View className="flex-1">
+                  {/* The parent's name rides along, so a circle reads the same
+                      here as it does anywhere else it is named. */}
+                  <CircleName
+                    circle={sub}
+                    numberOfLines={1}
+                    className="font-body-semibold text-[15px] leading-5 text-ink"
+                  />
+                  <Text className="mt-0.5 font-sans text-[12px] leading-4 text-ink-muted">
+                    {sub.members_count === 1 ? '1 member' : `${sub.members_count} members`}
+                    {sub.owner ? ` · kept by ${sub.owner.full_name}` : ''}
+                  </Text>
+                </View>
+
+                {sub.is_member ? (
+                  <SymbolView
+                    name={{
+                      ios: 'checkmark.circle.fill',
+                      android: 'check_circle',
+                      web: 'check_circle',
+                    }}
+                    size={18}
+                    tintColor={accent}
+                  />
+                ) : null}
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ) : null}
 
       {circle ? (
         <View className="mt-5 flex-row items-center justify-between border-t border-hairline px-6 pb-4 pt-5">

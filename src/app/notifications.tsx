@@ -3,7 +3,6 @@ import { SymbolView } from 'expo-symbols';
 import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -16,6 +15,7 @@ import { CircleBadge } from '@/components/circle-badge';
 import { Colors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
+import { useAlert } from '@/lib/confirm';
 import {
   acceptInvitation,
   declineInvitation,
@@ -137,6 +137,7 @@ export default function NotificationsScreen() {
   const theme = useTheme();
   const { token } = useAuth();
   const showToast = useToast();
+  const alert = useAlert();
 
   const [invitations, setInvitations] = useState<CircleInvitation[]>([]);
   const [alerts, setAlerts] = useState<AppNotification[]>([]);
@@ -278,15 +279,15 @@ export default function NotificationsScreen() {
         // Answered is no longer news — it drops off the list either way.
         setInvitations((previous) => previous.filter((row) => row.id !== invitation.id));
       } catch (caught) {
-        Alert.alert(
-          'That did not work',
-          caught instanceof Error ? caught.message : 'Please try again.'
-        );
+        await alert({
+          title: 'That did not work',
+          message: caught instanceof Error ? caught.message : 'Please try again.',
+        });
       } finally {
         setBusyId(null);
       }
     },
-    [token, showToast]
+    [token, showToast, alert]
   );
 
   const pull = useCallback(async () => {

@@ -591,14 +591,16 @@ function PillarSection({
                * is no "none" chip to fall back to. Saving without one is
                * refused rather than guessed at.
                *
-               * Choosing a different length is logging that sit, so it also
-               * takes back a "stopped early" that no longer describes it.
-               * Leaving the length alone leaves that flag alone.
+               * The length is all this touches. It used to mark the sit
+               * completed as well, on the reading that picking a length was
+               * logging it afresh — which quietly threw away a "stopped early"
+               * every time somebody corrected the duration, and even when they
+               * re-picked the length it already had. How long a sit ran and
+               * whether it was seen through are two separate facts, and this
+               * screen only asks about the first.
                */
               onPress={() =>
-                onChange(
-                  value === form.minutes ? { minutes: null } : { minutes: value, completed: true },
-                )
+                onChange(value === form.minutes ? { minutes: null } : { minutes: value })
               }
             />
           ))}

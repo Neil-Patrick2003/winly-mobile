@@ -14,12 +14,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useResolveClassNames } from 'uniwind';
 
 import { CircleBadge } from '@/components/circle-badge';
+import { CircleName, circleLabel } from '@/components/circle-name';
 import { ImageWithPlaceholder } from '@/components/ui/image';
 import { BottomTabInset } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
 import { joinCircle, type Circle } from '@/lib/circles';
 import { fetchDiscover, type Discover, type SuggestedPerson } from '@/lib/discover';
+import { useConfirm } from '@/lib/confirm';
 import { useFeed } from '@/lib/feed-context';
 import { setFollowing as setFollowingRemote } from '@/lib/posts';
 import { useToast } from '@/lib/toast';
@@ -48,7 +50,7 @@ function CircleRow({ circle, onJoined }: { circle: Circle; onJoined: (id: string
     try {
       await joinCircle(circle.id, token);
       onJoined(circle.id);
-      showToast(`Joined ${circle.name} 🌱`);
+      showToast(`Joined ${circleLabel(circle)} 🌱`);
     } catch (caught) {
       showToast(caught instanceof Error ? caught.message : 'Could not join that circle.');
     } finally {
@@ -66,7 +68,7 @@ function CircleRow({ circle, onJoined }: { circle: Circle; onJoined: (id: string
     <View className="mx-4 mt-3 flex-row items-center gap-3 rounded-3xl bg-surface-card px-4 py-3.5">
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Open ${circle.name}`}
+        accessibilityLabel={`Open ${circleLabel(circle)}`}
         onPress={() =>
           router.push({ pathname: '/circles/[circleId]', params: { circleId: circle.id } })
         }
@@ -74,9 +76,11 @@ function CircleRow({ circle, onJoined }: { circle: Circle; onJoined: (id: string
         <CircleBadge initial={circle.icon_initial} color={circle.color_hex} />
 
         <View className="flex-1">
-          <Text numberOfLines={1} className="font-body-semibold text-base leading-6 text-ink">
-            {circle.name}
-          </Text>
+          <CircleName
+            circle={circle}
+            numberOfLines={1}
+            className="font-body-semibold text-base leading-6 text-ink"
+          />
           <Text
             numberOfLines={1}
             className="mt-0.5 font-sans text-[13px] leading-[18px] text-ink-muted">
@@ -106,7 +110,7 @@ function CircleRow({ circle, onJoined }: { circle: Circle; onJoined: (id: string
       ) : (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Join ${circle.name}`}
+          accessibilityLabel={`Join ${circleLabel(circle)}`}
           accessibilityState={{ busy }}
           disabled={busy}
           onPress={() => void join()}
@@ -133,20 +137,52 @@ function PersonRow({
   onFollowed,
 }: {
   person: SuggestedPerson;
-  onFollowed: (id: string) => void;
+  /**
+   * Called once they have been followed, for the caller to retire the row.
+   *
+   * Absent while searching, where the row stays put and turns into "Following"
+   * — a search result is a person you went looking for, not a suggestion that
+   * has been spent.
+   */
+  onFollowed?: (id: string) => void;
 }) {
   const theme = useTheme();
   const { token } = useAuth();
-  const { setFollowed } = useFeed();
+  const { followState, setFollowed } = useFeed();
   const showToast = useToast();
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
 
-  const follow = async () => {
+  /*
+   * This session's answer first, the payload's second.
+   *
+   * `??` and not `||`: an unfollow is a `false` here, and OR-ing it against a
+   * row still carrying `is_following: true` would keep the badge on Following
+   * and make the tap look ignored.
+   */
+  const isFollowing = followState.get(person.id) ?? person.is_following;
+
+  const toggle = async () => {
     if (!token || busy) return;
 
+    const next = !isFollowing;
+
+    // Only on the way out, as everywhere else: following is cheap to undo, and
+    // unfollowing is the one people do by mistake.
+    if (!next) {
+      const confirmed = await confirm({
+        title: `Unfollow ${person.full_name}?`,
+        message: 'Their wins will stop appearing in your feed.',
+        confirmLabel: 'Unfollow',
+        destructive: true,
+      });
+      if (!confirmed) return;
+    }
+
     setBusy(true);
+    setFollowed(person.id, next);
     try {
-      const state = await setFollowingRemote(person.id, true, token);
+      const state = await setFollowingRemote(person.id, next, token);
       /*
        * Said out loud, and not only to the server.
        *
@@ -157,9 +193,13 @@ function PersonRow({
        * list still offering a Follow button.
        */
       setFollowed(person.id, state.is_following);
-      onFollowed(person.id);
-      showToast(`Following ${person.username ?? person.full_name}`);
+
+      if (state.is_following) {
+        onFollowed?.(person.id);
+        showToast(`Following ${person.username ?? person.full_name}`);
+      }
     } catch (caught) {
+      setFollowed(person.id, !next);
       showToast(caught instanceof Error ? caught.message : 'That did not go through.');
     } finally {
       setBusy(false);
@@ -204,21 +244,31 @@ function PersonRow({
       </View>
       </Pressable>
 
+      {/* Searching can turn up somebody you already follow, so the button has
+          to be able to say so — it used to read "Follow" whatever the truth
+          was, because the list could only ever contain people you did not. */}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Follow ${person.full_name}`}
-        accessibilityState={{ busy }}
+        accessibilityLabel={
+          isFollowing ? `Unfollow ${person.full_name}` : `Follow ${person.full_name}`
+        }
+        accessibilityState={{ busy, selected: isFollowing }}
         disabled={busy}
-        onPress={() => void follow()}
-        className="min-w-[86px] items-center rounded-full px-4 py-2.5 active:opacity-85"
-        style={{ backgroundColor: theme.text }}>
+        onPress={() => void toggle()}
+        className={`min-w-[86px] items-center rounded-full px-4 py-2.5 active:opacity-85 ${
+          isFollowing ? 'border border-hairline bg-surface-card' : ''
+        }`}
+        style={isFollowing ? undefined : { backgroundColor: theme.text }}>
         {busy ? (
-          <ActivityIndicator size="small" color={theme.background} />
+          <ActivityIndicator
+            size="small"
+            color={isFollowing ? theme.textSecondary : theme.background}
+          />
         ) : (
           <Text
             className="font-body-semibold text-[13px] leading-[18px]"
-            style={{ color: theme.background }}>
-            Follow
+            style={{ color: isFollowing ? theme.text : theme.background }}>
+            {isFollowing ? 'Following' : 'Follow'}
           </Text>
         )}
       </Pressable>
@@ -446,7 +496,14 @@ export default function DiscoverScreen() {
             <SectionTitle>People to follow</SectionTitle>
             {people.length > 0 ? (
               people.map((person) => (
-                <PersonRow key={person.id} person={person} onFollowed={markFollowed} />
+                /* Retired from the list once followed while browsing — the
+                   suggestion is spent. A search result stays, and turns into
+                   "Following" instead, because it is the person you came for. */
+                <PersonRow
+                  key={person.id}
+                  person={person}
+                  onFollowed={searching ? undefined : markFollowed}
+                />
               ))
             ) : (
               <Text className="mx-4 mt-3 rounded-3xl bg-surface-card px-4 py-6 text-center font-sans text-sm leading-5 text-ink-muted">

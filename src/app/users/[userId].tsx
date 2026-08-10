@@ -12,8 +12,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PILLAR_THEME } from '@/components/entry-chrome';
+import { ProfileAvatar } from '@/components/profile-avatar';
 import { ProfileCover } from '@/components/profile-cover';
-import { ImageWithPlaceholder } from '@/components/ui/image';
 import { Colors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
@@ -339,18 +339,7 @@ export default function UserProfileScreen() {
 
         <View className="-mt-12 flex-row items-end justify-between px-4">
           <View>
-            <View className="rounded-full bg-surface p-1">
-              <ImageWithPlaceholder
-                source={{ uri: profile.avatar_url }}
-                className="h-24 w-24 rounded-full"
-                accessibilityLabel={`${profile.full_name} profile photo`}>
-                <View className="h-24 w-24 items-center justify-center rounded-full bg-primary">
-                  <Text className="font-heading-bold text-4xl leading-[44px] text-white">
-                    {initial}
-                  </Text>
-                </View>
-              </ImageWithPlaceholder>
-            </View>
+            <ProfileAvatar uri={profile.avatar_url} name={profile.full_name} initial={initial} />
           </View>
 
           {/* Following reads as a state you can undo, not an invitation — so it

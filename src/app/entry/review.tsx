@@ -1,15 +1,7 @@
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AudiencePicker } from '@/components/audience-picker';
@@ -18,6 +10,7 @@ import { TextArea } from '@/components/ui/text-area';
 import { Colors } from '@/constants/theme';
 import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useAlert } from '@/lib/confirm';
 import { buildWins, OTHER_ACTIVITY, useEntryDraft, type Pillar } from '@/lib/entry-draft';
 import { useFeed } from '@/lib/feed-context';
 import { formatDuration } from '@/lib/meditation';
@@ -56,6 +49,7 @@ export default function ReviewStepScreen() {
   const { refreshUser } = useAuth();
   const dismissFlow = useDismissEntryFlow();
   const showToast = useToast();
+  const alert = useAlert();
   const [sharing, setSharing] = useState(false);
 
   const { meditation, learning, movement, caption } = draft;
@@ -118,30 +112,41 @@ export default function ReviewStepScreen() {
   const share = async () => {
     if (!canShare) return;
     setSharing(true);
+
+    let post;
+    /*
+     * Only the request is guarded.
+     *
+     * Everything after it runs against a post the server has already stored, so
+     * a failure there is not a failure to share — reporting it as one sends
+     * somebody back to press Share again and post the same win twice.
+     */
     try {
-      const post = await submit();
-
-      // The server handed the post back, so the feed can show it without a
-      // round trip. Counters live on the user record, which did just move.
-      prepend(post);
-      void refreshUser();
-
-      showToast(wins.length === 1 ? 'Win shared 🌱' : `${wins.length} wins shared 🌱`);
-      // Closes the modal outright, whichever step the flow is standing on.
-      dismissFlow();
+      post = await submit();
     } catch (caught) {
       setSharing(false);
-      Alert.alert(
-        'Could not share',
+      await alert({
+        title: 'Could not share',
         // A 422 keys its errors by position in the array we sent, so the step
         // at fault is only knowable by looking the index back up.
-        caught instanceof ApiError && Object.keys(caught.fieldErrors).length > 0
-          ? describeWinErrors(caught.fieldErrors, wins)
-          : caught instanceof Error
-            ? caught.message
-            : 'Something went wrong. Please try again.'
-      );
+        message:
+          caught instanceof ApiError && Object.keys(caught.fieldErrors).length > 0
+            ? describeWinErrors(caught.fieldErrors, wins)
+            : caught instanceof Error
+              ? caught.message
+              : 'Something went wrong. Please try again.',
+      });
+      return;
     }
+
+    // The server handed the post back, so the feed can show it without a
+    // round trip. Counters live on the user record, which did just move.
+    prepend(post);
+    void refreshUser();
+
+    showToast(wins.length === 1 ? 'Win shared 🌱' : `${wins.length} wins shared 🌱`);
+    // Closes the modal outright, whichever step the flow is standing on.
+    dismissFlow();
   };
 
   return (
