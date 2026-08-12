@@ -93,6 +93,38 @@ const SKIP_BELOW_BYTES = 600 * 1024;
 /** The ceiling for a single attachment. */
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
+/**
+ * The ceiling for one post's attachments put together.
+ *
+ * Set by nginx, not by us. Both Forge hosts answer 413 to a request body over
+ * 10MB — measured, not assumed: 10MB reaches Laravel and 11MB does not, on
+ * `welle-backend.on-forge.com` and `winly.on-forge.com` alike. Nothing in this
+ * repo or in `public/.user.ini` can lift that; `client_max_body_size` decides
+ * it before PHP is handed the request at all.
+ *
+ * 9MB rather than 10 leaves room for the part headers, the boundaries and the
+ * text fields riding alongside the photos, none of which are counted here but
+ * all of which nginx counts.
+ *
+ * This is the limit worth fixing on the server rather than living with — it
+ * sits *below* the 10MB per photo that both this app and the API's own
+ * `MediaFile` rule say is allowed, so a single photo at the documented maximum
+ * cannot be uploaded. Raise `client_max_body_size` and raise this with it.
+ */
+export const MAX_POST_BYTES = 9 * 1024 * 1024;
+
+/**
+ * The largest single photo that can actually be sent, whichever cap binds
+ * first.
+ *
+ * A photo bigger than a whole post may be is not sendable however generous the
+ * per-file rule is, and the picker should say so when it is picked rather than
+ * let the total say it at the end of the flow. Today the post budget is the
+ * smaller of the two; raise `client_max_body_size` and the per-file rule takes
+ * over again without this needing to change.
+ */
+export const MAX_PHOTO_BYTES = Math.min(MAX_UPLOAD_BYTES, MAX_POST_BYTES);
+
 /** "10 MB", "8.4 MB" — bytes as something to put in an alert. */
 export function formatBytes(bytes: number) {
   const mb = bytes / (1024 * 1024);
@@ -100,27 +132,52 @@ export function formatBytes(bytes: number) {
 }
 
 /**
+ * What a prepared file will put on the wire, or 0 when that cannot be worked
+ * out.
+ *
+ * 0 means "unknown", not "empty": `expo-file-system` reports 0 for a file it
+ * cannot read, and web cannot be asked at all. Callers here treat unknown as
+ * passing — a size we could not measure is not grounds to turn a photo away,
+ * and the upload is the better judge of it.
+ */
+export function sizeOf(file: LocalFile): number {
+  // Web measures the bytes it already holds. It cannot ask `expo-file-system`,
+  // which has no web implementation: `new File(uri)` there is a stub carrying
+  // no `size` at all, so asking it in a browser reads every photo as unknown.
+  if (file.blob) return file.blob.size;
+
+  try {
+    return new File(file.uri).size;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Whether a prepared file is small enough to send.
  *
  * Checked after `shrinkAsset`, because that is what decides the real size — a
  * 12MB camera photo comes out well under the cap, so measuring the original
- * would reject files that were never going to be a problem. `size` reads 0 for
- * a file that cannot be read, and a size we could not determine is not grounds
- * to drop the photo: let it through and let the upload be the judge.
+ * would reject files that were never going to be a problem.
+ *
+ * Judged against `MAX_PHOTO_BYTES`, so the answer matches what the upload will
+ * actually accept rather than what the per-file rule alone would allow.
  */
 export function isWithinUploadLimit(file: LocalFile) {
-  // Web measures the bytes it already holds. It cannot ask `expo-file-system`,
-  // which has no web implementation: `new File(uri)` there is a stub with no
-  // `size` at all, and `undefined <= MAX_UPLOAD_BYTES` is false — so every
-  // photo picked in a browser was turned away as too large to send.
-  if (file.blob) return file.blob.size <= MAX_UPLOAD_BYTES;
+  const size = sizeOf(file);
+  return size === 0 || size <= MAX_PHOTO_BYTES;
+}
 
-  try {
-    const { size } = new File(file.uri);
-    return size === 0 || size <= MAX_UPLOAD_BYTES;
-  } catch {
-    return true;
-  }
+/**
+ * What a set of attachments comes to, skipping the ones that cannot be
+ * measured.
+ *
+ * An undercount is the deliberate failure mode: this guards against a request
+ * too big to send, and blocking a share over bytes we never actually saw would
+ * be a worse outcome than letting the upload try.
+ */
+export function totalUploadBytes(files: LocalFile[]): number {
+  return files.reduce((total, file) => total + sizeOf(file), 0);
 }
 
 /**
@@ -211,9 +268,22 @@ export async function shrinkAsset(asset: ImagePickerAsset): Promise<LocalFile> {
       type: 'image/jpeg',
       blob: await bytesFor(result.uri),
     };
-  } catch {
+  } catch (caught) {
     // A photo we cannot process is still worth trying to send: the upload may
     // well succeed, and if it does not the error surfaces there instead.
+    //
+    // Reported rather than swallowed, though. This is the branch that turns a
+    // 300KB upload into a 12MB one, and it is otherwise invisible until posts
+    // start failing at the transport level with nothing to point at — a build
+    // missing `expo-image-manipulator` looks exactly like a flaky connection
+    // from the outside, and the two want opposite fixes.
+    console.warn(
+      '[welle] A photo could not be shrunk and is being sent at its original size. Uploads may ' +
+        'fail as a result, and the failure will look like a dropped connection rather than ' +
+        'this. On a device this usually means the dev client predates ' +
+        '`expo-image-manipulator` and needs rebuilding.',
+      caught
+    );
     return original;
   }
 }

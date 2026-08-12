@@ -6,7 +6,7 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { ImageWithPlaceholder } from '@/components/ui/image';
 import { Colors } from '@/constants/theme';
 import { useAlert } from '@/lib/confirm';
-import { formatBytes, isWithinUploadLimit, MAX_UPLOAD_BYTES, shrinkAsset } from '@/lib/media';
+import { formatBytes, isWithinUploadLimit, MAX_PHOTO_BYTES, shrinkAsset } from '@/lib/media';
 import type { LocalFile } from '@/lib/posts';
 
 /** How many photos one pillar takes. */
@@ -80,7 +80,7 @@ export function MediaPicker({
       if (rejected > 0) {
         void alert({
           title: rejected === 1 ? 'Photo too large' : `${rejected} photos too large`,
-          message: `Each photo has to be under ${formatBytes(MAX_UPLOAD_BYTES)}. ${
+          message: `Each photo has to be under ${formatBytes(MAX_PHOTO_BYTES)}. ${
             rejected === 1 ? 'It was' : 'They were'
           } left out — the rest were added.`,
         });
