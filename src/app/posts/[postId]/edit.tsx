@@ -24,6 +24,7 @@ import { useAuth } from '@/lib/auth-context';
 import { fetchCircles } from '@/lib/circles';
 import { ACTIVITIES, isMovementAnswered, OTHER_ACTIVITY } from '@/lib/entry-draft';
 import { useFeed } from '@/lib/feed-context';
+import { formatBytes, MAX_POST_BYTES, totalUploadBytes } from '@/lib/media';
 import { formatDuration, MEDITATION_DURATIONS } from '@/lib/meditation';
 import { goBack } from '@/lib/navigation';
 import {
@@ -377,6 +378,27 @@ export default function EditPostScreen() {
       return;
     }
 
+    const wins = winsFrom(form);
+
+    /*
+     * Only what is being added weighs anything: the photos the post already
+     * holds live on the server and are named, not re-sent.
+     *
+     * Same reasoning as the create flow. The per-photo cap belongs to the
+     * picker and cannot see across pillars, so two pillars of photos that each
+     * passed can still make a request the server refuses — and it refuses it by
+     * hanging up mid-body, which arrives here as an unreadable write failure
+     * rather than as the 413 it is.
+     */
+    const added = wins.flatMap((win) => win.media ?? []);
+    if (totalUploadBytes(added) > MAX_POST_BYTES) {
+      showToast(
+        `New photos come to more than ${formatBytes(MAX_POST_BYTES)} together. ` +
+          'Remove a couple and save again.',
+      );
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -391,7 +413,7 @@ export default function EditPostScreen() {
       const saved = await updatePost(
         post.id,
         {
-          wins: winsFrom(form),
+          wins,
           caption: caption.trim(),
           visibility,
           ...(visibility === 'custom' ? { circle_ids: chosenCircleIds } : {}),

@@ -8,13 +8,13 @@ import { AudiencePicker } from '@/components/audience-picker';
 import { EntryHeader, PILLAR_THEME, useDismissEntryFlow } from '@/components/entry-chrome';
 import { TextArea } from '@/components/ui/text-area';
 import { Colors } from '@/constants/theme';
-import { ApiError } from '@/lib/api';
+import { ApiError, NetworkError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { useAlert } from '@/lib/confirm';
+import { useAlert, useConfirm } from '@/lib/confirm';
 import { buildWins, OTHER_ACTIVITY, useEntryDraft, type Pillar } from '@/lib/entry-draft';
 import { useFeed } from '@/lib/feed-context';
 import { formatDuration } from '@/lib/meditation';
-import { describeWinErrors } from '@/lib/posts';
+import { describeWinErrors, type NewWin } from '@/lib/posts';
 import { useToast } from '@/lib/toast';
 
 type Summary = {
@@ -26,6 +26,20 @@ type Summary = {
 };
 
 const photoCount = (n: number) => `${n} photo${n === 1 ? '' : 's'} attached`;
+
+/**
+ * A failed share, in the words of the person who pressed the button.
+ *
+ * A 422 keys its errors by position in the array we sent, so the step at fault
+ * is only knowable by looking the index back up.
+ */
+function describeShareError(caught: unknown, wins: NewWin[]) {
+  if (caught instanceof ApiError && Object.keys(caught.fieldErrors).length > 0) {
+    return describeWinErrors(caught.fieldErrors, wins);
+  }
+
+  return caught instanceof Error ? caught.message : 'Something went wrong. Please try again.';
+}
 
 /**
  * The last step: a caption, and a read-back of everything the three steps
@@ -50,6 +64,7 @@ export default function ReviewStepScreen() {
   const dismissFlow = useDismissEntryFlow();
   const showToast = useToast();
   const alert = useAlert();
+  const confirm = useConfirm();
   const [sharing, setSharing] = useState(false);
 
   const { meditation, learning, movement, caption } = draft;
@@ -121,22 +136,43 @@ export default function ReviewStepScreen() {
      * a failure there is not a failure to share — reporting it as one sends
      * somebody back to press Share again and post the same win twice.
      */
-    try {
-      post = await submit();
-    } catch (caught) {
-      setSharing(false);
-      await alert({
-        title: 'Could not share',
-        // A 422 keys its errors by position in the array we sent, so the step
-        // at fault is only knowable by looking the index back up.
-        message:
-          caught instanceof ApiError && Object.keys(caught.fieldErrors).length > 0
-            ? describeWinErrors(caught.fieldErrors, wins)
-            : caught instanceof Error
-              ? caught.message
-              : 'Something went wrong. Please try again.',
-      });
-      return;
+    for (;;) {
+      try {
+        post = await submit();
+        break;
+      } catch (caught) {
+        /*
+         * A transport failure is the only one worth offering another go at.
+         * Everything else — a 422, a 429, a body too big to send — fails again
+         * identically until something about the draft or the wait changes, so
+         * a retry button on those would only be a slower way to say no.
+         */
+        if (!(caught instanceof NetworkError)) {
+          setSharing(false);
+          await alert({ title: 'Could not share', message: describeShareError(caught, wins) });
+          return;
+        }
+
+        /*
+         * Offered rather than done automatically. The usual cause is a request
+         * the server hung up on mid-body, which never reached Laravel — but one
+         * that timed out after the last byte went out may well have been stored,
+         * and nothing here can tell the two apart. Reposting the same win
+         * silently is worse than asking, so the choice stays with the person
+         * who knows whether it showed up.
+         */
+        const again = await confirm({
+          title: 'Could not share',
+          message: `${caught.message}\n\nYour win is still here — nothing was lost.`,
+          confirmLabel: 'Try again',
+          cancelLabel: 'Not now',
+        });
+
+        if (!again) {
+          setSharing(false);
+          return;
+        }
+      }
     }
 
     // The server handed the post back, so the feed can show it without a
