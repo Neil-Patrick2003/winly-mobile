@@ -12,6 +12,7 @@ import {
 
 import { useAuth } from '@/lib/auth-context';
 import { fetchCircles } from '@/lib/circles';
+import { formatBytes, MAX_POST_BYTES, totalUploadBytes } from '@/lib/media';
 import {
   createPost,
   toMovementType,
@@ -300,6 +301,23 @@ export function EntryDraftProvider({ children }: { children: ReactNode }) {
 
         const wins = buildWins(draft);
         if (wins.length === 0) throw new Error('Add something to share first.');
+
+        /*
+         * The per-photo cap is the picker's, applied one pillar at a time, so
+         * until here nothing has looked at what the pillars come to together.
+         * Ten photos that each passed can still make a request the server will
+         * refuse — and it refuses it by hanging up while the body is still
+         * going out, which reaches the client as an unreadable write failure
+         * rather than as the 413 it really is. Caught here, it can at least be
+         * described accurately and while the photos are still removable.
+         */
+        const attachments = wins.flatMap((win) => win.media ?? []);
+        if (totalUploadBytes(attachments) > MAX_POST_BYTES) {
+          throw new Error(
+            `These photos come to more than ${formatBytes(MAX_POST_BYTES)} together, which is ` +
+              'more than one post can carry. Remove a couple and share the rest.'
+          );
+        }
 
         const caption = buildCaption(draft);
 
