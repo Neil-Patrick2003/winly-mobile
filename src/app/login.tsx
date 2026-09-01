@@ -187,19 +187,16 @@ export default function LoginScreen() {
               <Text className="font-sans text-sm leading-5 text-ink">Stay signed in</Text>
             </Pressable>
 
-            {/* Hidden until the reset email can actually arrive.
+            {/* Carries whatever has been typed in the email field across, so
+                the next screen usually has nothing left to ask for — this is
+                reached after an attempt that did not work, not before one.
 
-                The flow itself works — the code is minted, stored and handed to
-                Brevo, which accepts it. Gmail is what drops it: the sender is
-                `app.welle@gmail.com`, and Brevo cannot authenticate a free
-                webmail domain, so the message fails DMARC alignment and never
-                reaches the inbox. Offering the button anyway sends people to a
-                screen that asks them to wait for something that is not coming,
-                which is worse than not offering it.
-
-                Put back by uncommenting, once MAIL_FROM_ADDRESS is on a domain
-                authenticated in Brevo. Nothing else here has to change.
-
+                Delivery is the thing to watch here rather than the flow: the
+                code is minted, stored and accepted by Brevo either way, but a
+                message sent from a free webmail address cannot be authenticated
+                for that domain and is dropped on DMARC by the larger inboxes.
+                If reset mail is not arriving, MAIL_FROM_ADDRESS is the first
+                place to look, not this screen. */}
             <Link href={{ pathname: '/forgot-password', params: { email: email.trim() } }} asChild>
               <Pressable accessibilityRole="button" hitSlop={6} className="px-1 active:opacity-60">
                 <Text className="font-body-semibold text-sm leading-5 text-ink">
@@ -207,7 +204,6 @@ export default function LoginScreen() {
                 </Text>
               </Pressable>
             </Link>
-            */}
           </View>
 
           {error || emailInvalid ? (
