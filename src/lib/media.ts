@@ -96,22 +96,24 @@ export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 /**
  * The ceiling for one post's attachments put together.
  *
- * Set by nginx, not by us. Both Forge hosts answer 413 to a request body over
- * 10MB — measured, not assumed: 10MB reaches Laravel and 11MB does not, on
- * `welle-backend.on-forge.com` and `winly.on-forge.com` alike. Nothing in this
- * repo or in `public/.user.ini` can lift that; `client_max_body_size` decides
- * it before PHP is handed the request at all.
+ * Ours rather than the server's, and about the phone rather than the backend.
+ * `MAX_UPLOAD_BYTES` is per photo and a post carries up to ten of them across
+ * two pillars, so the per-file cap on its own would permit a 100MB request —
+ * which no mobile uplink finishes in a time anyone waits out, whatever nginx is
+ * willing to accept.
  *
- * 9MB rather than 10 leaves room for the part headers, the boundaries and the
- * text fields riding alongside the photos, none of which are counted here but
- * all of which nginx counts.
+ * Shrunk photos land around 300KB, so ten of them come to a few megabytes and
+ * never approach this. It is here for the case where `shrinkAsset` fell back to
+ * the originals — raw camera photos reach 25MB in three or four, and saying so
+ * up front beats a long upload that dies with nothing to point at.
  *
- * This is the limit worth fixing on the server rather than living with — it
- * sits *below* the 10MB per photo that both this app and the API's own
- * `MediaFile` rule say is allowed, so a single photo at the documented maximum
- * cannot be uploaded. Raise `client_max_body_size` and raise this with it.
+ * This was 9MB for as long as `client_max_body_size` was 10M on the Forge
+ * hosts, which was below the 10MB per photo that both this app and the API's
+ * own `MediaFile` rule claim to allow. Both hosts were raised to 120M on
+ * 2026-08-12, matching `post_max_size` in the backend's `public/.user.ini`, and
+ * measured accepting 30MB afterwards.
  */
-export const MAX_POST_BYTES = 9 * 1024 * 1024;
+export const MAX_POST_BYTES = 25 * 1024 * 1024;
 
 /**
  * The largest single photo that can actually be sent, whichever cap binds
@@ -119,9 +121,9 @@ export const MAX_POST_BYTES = 9 * 1024 * 1024;
  *
  * A photo bigger than a whole post may be is not sendable however generous the
  * per-file rule is, and the picker should say so when it is picked rather than
- * let the total say it at the end of the flow. Today the post budget is the
- * smaller of the two; raise `client_max_body_size` and the per-file rule takes
- * over again without this needing to change.
+ * let the total say it at the end of the flow. The per-file rule is the smaller
+ * of the two again now that the post budget is 25MB; it was the other way round
+ * while the servers capped a whole request at 10MB.
  */
 export const MAX_PHOTO_BYTES = Math.min(MAX_UPLOAD_BYTES, MAX_POST_BYTES);
 
