@@ -65,6 +65,25 @@ export default function SettingsScreen() {
           />
         </Pressable>
 
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/blocked')}
+          className="mt-2 flex-row items-center gap-3 rounded-lg bg-surface-card p-4 active:opacity-70">
+          <SymbolView
+            name={{ ios: 'nosign', android: 'block', web: 'block' }}
+            size={17}
+            tintColor={Colors.light.textSecondary}
+          />
+          <Text className="flex-1 font-body-semibold text-[15px] leading-5 text-ink">
+            Blocked accounts
+          </Text>
+          <SymbolView
+            name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }}
+            size={14}
+            tintColor={Colors.light.textSecondary}
+          />
+        </Pressable>
+
         <Text className="pt-6 font-body-semibold text-xs uppercase leading-4 tracking-wider text-ink-muted">
           Legal
         </Text>

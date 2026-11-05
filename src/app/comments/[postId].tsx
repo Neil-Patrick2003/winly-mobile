@@ -35,6 +35,8 @@ import {
 import { timeAgo } from '@/lib/time';
 import { useToast } from '@/lib/toast';
 import { goBack } from '@/lib/navigation';
+import { BLOCK_ICON, REPORT_ICON } from '@/lib/moderation';
+import { useModeration } from '@/lib/use-moderation';
 
 /**
  * The given name, for the title. A full display name turns the header into a
@@ -83,16 +85,23 @@ function CommentRow({
   comment,
   canEdit,
   canDelete,
+  canReport,
   onSave,
   onDelete,
+  onReport,
+  onBlock,
 }: {
   comment: Comment;
   /** Only the person who wrote it — `PATCH /comments/{id}` allows no one else. */
   canEdit: boolean;
   /** Its author, or the author of the post it is on, per `DELETE /comments/{id}`. */
   canDelete: boolean;
+  /** Anyone else's comment. Your own is not yours to report. */
+  canReport: boolean;
   onSave: (text: string) => Promise<boolean>;
   onDelete: () => void;
+  onReport: () => void;
+  onBlock: () => void;
 }) {
   const theme = useTheme();
   const muted = useResolveClassNames('text-ink-muted').color;
@@ -123,6 +132,17 @@ function CommentRow({
         ]
       : []),
     ...(canDelete ? [{ label: 'Delete', icon: DELETE_ICON, onPress: onDelete }] : []),
+    ...(canReport
+      ? [
+          { label: 'Report comment', icon: REPORT_ICON, onPress: onReport },
+          {
+            label: `Block ${comment.author.username ?? comment.author.full_name}`,
+            icon: BLOCK_ICON,
+            destructive: true,
+            onPress: onBlock,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -212,6 +232,7 @@ export default function CommentsScreen() {
   const theme = useTheme();
   const muted = useResolveClassNames('text-ink-muted').color;
   const { user, token } = useAuth();
+  const moderation = useModeration();
   const { posts, adjustComments, adoptSavedState } = useFeed();
   const showToast = useToast();
   const confirm = useConfirm();
@@ -388,6 +409,17 @@ export default function CommentsScreen() {
     }
   };
 
+  /** Block whoever wrote this, and take everything they said here off the screen. */
+  const blockAuthor = async (comment: Comment) => {
+    const blocked = await moderation.block({
+      id: comment.author.id,
+      name: comment.author.username ?? comment.author.full_name,
+    });
+    if (blocked) {
+      setComments((current) => current.filter((item) => item.author.id !== comment.author.id));
+    }
+  };
+
   const confirmDelete = async (comment: Comment) => {
     // Removing someone else's words off your own post is a different act from
     // deleting your own, so the prompt says whose it is rather than leaving the
@@ -472,8 +504,16 @@ export default function CommentsScreen() {
               // undefined only when it could not be loaded at all, which
               // quietly falls back to the stricter author-only rule.
               canDelete={user?.id === item.author.id || user?.id === post?.author.id}
+              canReport={Boolean(user) && user?.id !== item.author.id}
               onSave={(text) => save(item, text)}
               onDelete={() => void confirmDelete(item)}
+              onReport={() =>
+                moderation.report('comment', item.id, {
+                  id: item.author.id,
+                  name: item.author.username ?? item.author.full_name,
+                })
+              }
+              onBlock={() => void blockAuthor(item)}
             />
           )}
           contentContainerClassName="w-full max-w-[800px] self-center"

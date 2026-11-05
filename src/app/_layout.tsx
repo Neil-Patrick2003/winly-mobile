@@ -114,6 +114,8 @@ function RootNavigator() {
       <Stack.Screen name="reset-password" />
       <Stack.Screen name="settings" />
       <Stack.Screen name="delete-account" />
+      <Stack.Screen name="blocked" />
+      <Stack.Screen name="report" options={{ presentation: 'modal' }} />
       {/* Reached from your own profile, and pushed rather than presented: it is
           a place you go and come back from, not a task you finish. */}
       <Stack.Screen name="saved" />
