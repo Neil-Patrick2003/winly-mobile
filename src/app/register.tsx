@@ -18,6 +18,7 @@ import { Wordmark } from '@/components/wordmark';
 import { Colors } from '@/constants/theme';
 import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { openLegalPage, PRIVACY_POLICY_URL, TERMS_URL } from '@/lib/legal';
 import { goBack } from '@/lib/navigation';
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -40,6 +41,7 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [acceptTerms, setAcceptTerms] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   /** 422 messages from the API, keyed by its field names. */
@@ -76,7 +78,8 @@ export default function RegisterScreen() {
     usernameValid &&
     emailValid &&
     passwordValid &&
-    confirmPassword === password;
+    confirmPassword === password &&
+    acceptTerms;
   const canSubmit = formValid && !submitting && cooldown === 0;
 
   // Only one message at a time, nearest problem first. The standing rule is
@@ -87,6 +90,7 @@ export default function RegisterScreen() {
     serverErrors.username ??
     serverErrors.email ??
     serverErrors.password ??
+    serverErrors.accept_terms ??
     (usernameInvalid
       ? 'Username must be 3–30 characters: lowercase letters, numbers and underscores.'
       : emailInvalid
@@ -116,7 +120,14 @@ export default function RegisterScreen() {
     setFormError(null);
 
     try {
-      await register({ fullName, username, email, password, passwordConfirmation: confirmPassword });
+      await register({
+        fullName,
+        username,
+        email,
+        password,
+        passwordConfirmation: confirmPassword,
+        acceptTerms,
+      });
       router.replace('/(tabs)/home');
     } catch (caught) {
       if (caught instanceof ApiError) {
@@ -287,6 +298,58 @@ export default function RegisterScreen() {
             {passwordValid
               ? 'That password will do nicely.'
               : `Password must be at least ${MIN_PASSWORD_LENGTH} characters`}
+          </Text>
+        </View>
+
+        {/* Agreeing to the Terms and the Privacy Policy, which both app stores
+            expect before somebody can post. The links open the pages over the
+            form rather than leaving it, so nothing typed is lost. */}
+        <View className="flex-row items-start gap-2.5 px-1 pt-5">
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: acceptTerms }}
+            accessibilityLabel="I agree to the Terms of Service and Privacy Policy"
+            onPress={() => {
+              setAcceptTerms((value) => !value);
+              setServerErrors(({ accept_terms: _removed, ...rest }) => rest);
+            }}
+            hitSlop={8}
+            className="mt-0.5 active:opacity-70">
+            <View
+              className={`h-5 w-5 items-center justify-center rounded-md border-2 ${
+                acceptTerms ? '' : 'border-hairline bg-surface-card'
+              }`}
+              style={
+                acceptTerms
+                  ? { borderColor: Colors.light.primary, backgroundColor: Colors.light.primary }
+                  : undefined
+              }>
+              {acceptTerms ? (
+                <SymbolView
+                  name={{ ios: 'checkmark', android: 'check', web: 'check' }}
+                  size={11}
+                  weight="bold"
+                  tintColor="#FFFFFF"
+                />
+              ) : null}
+            </View>
+          </Pressable>
+          <Text className="flex-1 font-sans text-sm leading-5 text-ink">
+            I agree to the{' '}
+            <Text
+              accessibilityRole="link"
+              onPress={() => openLegalPage(TERMS_URL)}
+              className="font-body-semibold text-primary underline">
+              Terms of Service
+            </Text>{' '}
+            and{' '}
+            <Text
+              accessibilityRole="link"
+              onPress={() => openLegalPage(PRIVACY_POLICY_URL)}
+              className="font-body-semibold text-primary underline">
+              Privacy Policy
+            </Text>
+            .
           </Text>
         </View>
 

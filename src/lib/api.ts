@@ -1,12 +1,5 @@
-/**
- * Thin fetch wrapper for the Laravel backend.
- *
- * The base URL is overridable because `winly-backend.test` is a Herd/Valet
- * domain resolved by the Mac's DNS: the iOS simulator inherits that, but a
- * physical device or an Android emulator does not. Point EXPO_PUBLIC_API_URL at
- * the machine's LAN address there.
- */
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://winly-backend.test/';
+
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 /** Laravel's validation-error envelope. */
 type LaravelErrorBody = {

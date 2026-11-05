@@ -71,6 +71,8 @@ export type RegisterInput = {
   email: string;
   password: string;
   passwordConfirmation: string;
+  /** Ticked "I agree" on the sign-up screen. The server refuses without it. */
+  acceptTerms: boolean;
 };
 
 /**
@@ -89,6 +91,7 @@ export function registerRequest(input: RegisterInput) {
     email: input.email.trim(),
     password: input.password,
     password_confirmation: input.passwordConfirmation,
+    accept_terms: input.acceptTerms,
     device_name: getDeviceName(),
   });
 }
@@ -124,7 +127,9 @@ export function loginRequest(input: LoginInput) {
  * the screen must move on to the code step regardless of what comes back.
  */
 export function requestPasswordResetCode(email: string) {
-  return apiPost<{ message: string }>('/api/v1/forgot-password', { email: email.trim() });
+  return apiPost<{ message: string }>('/api/v1/forgot-password', {
+    email: email.trim(),
+  });
 }
 
 export type ResetPasswordInput = {
