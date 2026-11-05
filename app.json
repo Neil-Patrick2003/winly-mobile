@@ -16,10 +16,7 @@
         "foregroundImage": "./assets/images/brand/generated/welle-adaptive-1024.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.neilpatrick.winly",
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ]
+      "package": "com.neilpatrick.winly"
     },
     "web": {
       "output": "static",
@@ -60,7 +57,9 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Welle needs access to your photos so you can attach one to a movement or learning entry."
+          "photosPermission": "Welle needs access to your photos so you can attach one to a movement or learning entry.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ]
     ],
