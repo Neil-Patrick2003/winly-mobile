@@ -13,6 +13,7 @@ import { ApiError } from '@/lib/api';
 import {
   fetchUser,
   loginRequest,
+  deleteAccountRequest,
   logoutRequest,
   registerRequest,
   resetPasswordRequest,
@@ -47,6 +48,13 @@ type AuthContextValue = {
    */
   resetPassword: (input: ResetPasswordInput) => Promise<void>;
   logout: () => Promise<void>;
+  /**
+   * Delete the account for good, then sign out here.
+   *
+   * Throws (and stays signed in) if the server refuses — most often a wrong
+   * password, which arrives as an `ApiError` with a `password` field error.
+   */
+  deleteAccount: (password: string) => Promise<void>;
   /**
    * Re-read the user. Counters live on that record — `wins_count`, `streak_days`
    * — so anything that moves them has to ask for it again.
@@ -181,6 +189,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [token]);
 
+  const deleteAccount = useCallback(
+    async (password: string) => {
+      if (!token) return;
+
+      // Push registrations, tokens and everything else go with the account on
+      // the server, so there is nothing to unregister first.
+      await deleteAccountRequest(password, token);
+
+      pushToken.current = null;
+      await clearToken();
+      setUser(null);
+      setToken(null);
+    },
+    [token]
+  );
+
   const value = useMemo(
     () => ({
       user,
@@ -191,9 +215,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       resetPassword,
       logout,
+      deleteAccount,
       refreshUser,
     }),
-    [user, token, isRestoring, register, login, resetPassword, logout, refreshUser]
+    [user, token, isRestoring, register, login, resetPassword, logout, deleteAccount, refreshUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -6,7 +6,7 @@
  * physical device or an Android emulator does not. Point EXPO_PUBLIC_API_URL at
  * the machine's LAN address there.
  */
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://winly.on-forge.com';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://winly-backend.test/';
 
 /** Laravel's validation-error envelope. */
 type LaravelErrorBody = {
@@ -189,6 +189,7 @@ export function apiPatch<TResponse>(path: string, body?: unknown, token?: string
   return apiRequest<TResponse>('PATCH', path, { body, token });
 }
 
-export function apiDelete<TResponse>(path: string, token?: string | null) {
-  return apiRequest<TResponse>('DELETE', path, { token });
+/** `body` is for the rare delete that has to say something, like a password. */
+export function apiDelete<TResponse>(path: string, token?: string | null, body?: unknown) {
+  return apiRequest<TResponse>('DELETE', path, { body, token });
 }

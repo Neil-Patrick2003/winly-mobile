@@ -1,13 +1,14 @@
-import { SymbolView } from 'expo-symbols';
-import { Pressable, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from "expo-router";
+import { SymbolView } from "expo-symbols";
+import { Pressable, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Colors } from '@/constants/theme';
-import { goBack } from '@/lib/navigation';
+import { Colors } from "@/constants/theme";
+import { goBack } from "@/lib/navigation";
 
 /**
- * Reached from the header. A placeholder — the settings themselves are not
- * built yet, but the route has to exist for the header's typed link to resolve.
+ * Reached from the header. Most preferences are not built yet; what is here
+ * is the account deletion both app stores require to be findable in-app.
  */
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -21,18 +22,55 @@ export default function SettingsScreen() {
             accessibilityLabel="Go back"
             onPress={() => goBack()}
             hitSlop={8}
-            className="-ml-2 p-2 active:opacity-60">
+            className="-ml-2 p-2 active:opacity-60"
+          >
             <SymbolView
-              name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }}
+              name={{
+                ios: "chevron.left",
+                android: "arrow_back",
+                web: "arrow_back",
+              }}
               size={18}
               tintColor={Colors.light.text}
             />
           </Pressable>
-          <Text className="font-heading-bold text-xl leading-7 text-ink">Settings</Text>
+          <Text className="font-heading-bold text-xl leading-7 text-ink">
+            Settings
+          </Text>
         </View>
 
+        <Text className="pt-6 font-body-semibold text-xs uppercase leading-4 tracking-wider text-ink-muted">
+          Account
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push("/delete-account")}
+          className="mt-2 flex-row items-center gap-3 rounded-lg bg-surface-card p-4 active:opacity-70"
+        >
+          <SymbolView
+            name={{ ios: "trash", android: "delete", web: "delete" }}
+            size={17}
+            tintColor="#DC2626"
+          />
+          <Text
+            className="flex-1 font-body-semibold text-[15px] leading-5"
+            style={{ color: "#DC2626" }}
+          >
+            Delete account
+          </Text>
+          <SymbolView
+            name={{
+              ios: "chevron.right",
+              android: "chevron_right",
+              web: "chevron_right",
+            }}
+            size={14}
+            tintColor={Colors.light.textSecondary}
+          />
+        </Pressable>
+
         <Text className="pt-6 font-sans text-sm leading-5 text-ink-muted">
-          Account, privacy and notification preferences will live here.
+          Privacy and notification preferences will live here.
         </Text>
       </View>
     </View>

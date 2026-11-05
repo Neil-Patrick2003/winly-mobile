@@ -439,6 +439,34 @@ export default function ProfileScreen() {
           />
         </Pressable>
 
+        {/* The way into Settings, and through it to deleting the account, which
+            both app stores require to be findable from inside the app. */}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/settings')}
+          className="mx-4 mt-3 flex-row items-center gap-3 rounded-3xl bg-surface-card px-4 py-3.5 active:opacity-70">
+          <View className="h-11 w-11 items-center justify-center rounded-2xl bg-surface-selected">
+            <SymbolView
+              name={{ ios: 'gearshape', android: 'settings', web: 'settings' }}
+              size={20}
+              tintColor={Colors.light.textSecondary}
+            />
+          </View>
+          <View className="flex-1">
+            <Text className="font-body-semibold text-[15px] leading-5 text-ink">Settings</Text>
+            <Text
+              numberOfLines={1}
+              className="mt-0.5 font-sans text-[13px] leading-[18px] text-ink-muted">
+              Account and privacy
+            </Text>
+          </View>
+          <SymbolView
+            name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }}
+            size={14}
+            tintColor={Colors.light.textSecondary}
+          />
+        </Pressable>
+
         {/* Only for admins, and only because the server says so — `is_admin`
             comes off the user record rather than being guessed at here. */}
         {user.is_admin ? (

@@ -1,6 +1,6 @@
 import * as Device from 'expo-device';
 
-import { apiGet, apiPost } from '@/lib/api';
+import { apiDelete, apiGet, apiPost } from '@/lib/api';
 
 export type User = {
   /** A UUID, not a sequential integer — never do arithmetic or ordering on it. */
@@ -160,6 +160,16 @@ export function resetPasswordRequest(input: ResetPasswordInput) {
  */
 export function logoutRequest(token: string) {
   return apiPost<void>('/api/v1/logout', undefined, token);
+}
+
+/**
+ * DELETE /api/v1/profile — deletes the account and everything in it, for good.
+ *
+ * Asks for the password again. A wrong one is a 422 with a `password` field
+ * error. Every token goes with the account, so a 204 means sign out locally.
+ */
+export function deleteAccountRequest(password: string, token: string) {
+  return apiDelete<void>('/api/v1/profile', token, { password });
 }
 
 /**

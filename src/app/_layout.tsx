@@ -113,6 +113,7 @@ function RootNavigator() {
       <Stack.Screen name="forgot-password" />
       <Stack.Screen name="reset-password" />
       <Stack.Screen name="settings" />
+      <Stack.Screen name="delete-account" />
       {/* Reached from your own profile, and pushed rather than presented: it is
           a place you go and come back from, not a task you finish. */}
       <Stack.Screen name="saved" />
