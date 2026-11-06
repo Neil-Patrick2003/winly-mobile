@@ -62,6 +62,35 @@ function toFieldErrors(errors: Record<string, string[]> | undefined) {
   return flat;
 }
 
+/**
+ * Why the server stopped accepting this device's session.
+ *
+ * `expired` is a 401: the token was revoked, by signing out elsewhere, a
+ * password reset, or the account being deleted. `disabled` is staff having
+ * switched the account off.
+ */
+export type SessionEndReason = 'expired' | 'disabled';
+
+/** Kept in step with `EnsureAccountIsActive::MESSAGE` on the server. */
+const DISABLED_PREFIX = 'This account has been disabled';
+
+let onSessionEnded: ((token: string, reason: SessionEndReason, message: string) => void) | null =
+  null;
+
+/**
+ * Register what happens when a signed-in request is refused because the
+ * session itself is gone. The auth provider uses it to sign out locally, so a
+ * revoked or disabled account is not left on screens that can only fail.
+ *
+ * Told which token was refused, so a late reply for a session that has already
+ * been replaced cannot sign out the new one.
+ */
+export function setSessionEndedHandler(
+  handler: ((token: string, reason: SessionEndReason, message: string) => void) | null
+) {
+  onSessionEnded = handler;
+}
+
 type RequestOptions = {
   /** A `FormData` body is sent as multipart; anything else is JSON. */
   body?: unknown;
@@ -139,6 +168,16 @@ async function apiRequest<TResponse>(
 
   if (response.status === 413) {
     throw new ApiError(413, data.message ?? 'That file is too large to upload. Try a smaller one.');
+  }
+
+  // Only for requests that carried a session. A 401 from signing in is a wrong
+  // password, not a session ending.
+  if (token) {
+    if (response.status === 401) {
+      onSessionEnded?.(token, 'expired', 'You were signed out. Please sign in again.');
+    } else if (response.status === 403 && data.message?.startsWith(DISABLED_PREFIX)) {
+      onSessionEnded?.(token, 'disabled', data.message);
+    }
   }
 
   if (response.status === 429) {

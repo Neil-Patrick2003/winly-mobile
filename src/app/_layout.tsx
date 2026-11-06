@@ -1,8 +1,9 @@
 import '@/global.css';
 
-import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DefaultTheme, router, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { ScopedTheme } from 'uniwind';
 
@@ -10,7 +11,7 @@ import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { Colors } from '@/constants/theme';
 import { useBrandFonts } from '@/hooks/use-brand-fonts';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
-import { ConfirmProvider } from '@/lib/confirm';
+import { ConfirmProvider, useAlert } from '@/lib/confirm';
 import { FeedProvider } from '@/lib/feed-context';
 import { ToastProvider } from '@/lib/toast';
 import { usePushTaps } from '@/lib/use-push-taps';
@@ -87,7 +88,26 @@ export default function RootLayout() {
 }
 
 function RootNavigator() {
-  const { isRestoring } = useAuth();
+  const { isRestoring, sessionEnded, clearSessionEnded } = useAuth();
+  const alert = useAlert();
+
+  /*
+   * The server ended the session: the token was revoked, or staff disabled the
+   * account. Auth has already signed out locally; this takes the person back
+   * to the start and says why, rather than leaving them on a screen whose every
+   * request now fails.
+   */
+  useEffect(() => {
+    if (!sessionEnded) return;
+
+    const { reason, message } = sessionEnded;
+    clearSessionEnded();
+    router.replace('/');
+    void alert({
+      title: reason === 'disabled' ? 'Account disabled' : 'Signed out',
+      message,
+    });
+  }, [sessionEnded, clearSessionEnded, alert]);
 
   // Inside the navigator, because it navigates: a tap has to reach a router
   // that is already mounted. Its own guards keep it quiet until there is a
