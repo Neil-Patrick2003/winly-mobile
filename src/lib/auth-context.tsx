@@ -9,10 +9,11 @@ import {
   type ReactNode,
 } from 'react';
 
-import { ApiError } from '@/lib/api';
+import { ApiError, setSessionEndedHandler, type SessionEndReason } from '@/lib/api';
 import {
   fetchUser,
   loginRequest,
+  deleteAccountRequest,
   logoutRequest,
   registerRequest,
   resetPasswordRequest,
@@ -48,10 +49,24 @@ type AuthContextValue = {
   resetPassword: (input: ResetPasswordInput) => Promise<void>;
   logout: () => Promise<void>;
   /**
+   * Delete the account for good, then sign out here.
+   *
+   * Throws (and stays signed in) if the server refuses — most often a wrong
+   * password, which arrives as an `ApiError` with a `password` field error.
+   */
+  deleteAccount: (password: string) => Promise<void>;
+  /**
    * Re-read the user. Counters live on that record — `wins_count`, `streak_days`
    * — so anything that moves them has to ask for it again.
    */
   refreshUser: () => Promise<void>;
+  /**
+   * Set when the server ended the session rather than the person signing out:
+   * the token was revoked, or the account was disabled. Read once by the root
+   * layout to say why, then cleared.
+   */
+  sessionEnded: { reason: SessionEndReason; message: string } | null;
+  clearSessionEnded: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -76,6 +91,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * `logout`, which must not be rebuilt every time registration finishes.
    */
   const pushToken = useRef<string | null>(null);
+
+  const [sessionEnded, setSessionEnded] = useState<{
+    reason: SessionEndReason;
+    message: string;
+  } | null>(null);
+
+  /*
+   * The token in use right now, readable from the API layer's callback without
+   * re-registering it on every change. A refusal for any other token is a late
+   * reply from a session already replaced, and must not end this one.
+   */
+  const currentToken = useRef<string | null>(null);
+  useEffect(() => {
+    currentToken.current = token;
+  }, [token]);
+
+  useEffect(() => {
+    setSessionEndedHandler((refused, reason, message) => {
+      if (refused !== currentToken.current) return;
+
+      currentToken.current = null;
+      pushToken.current = null;
+      void clearToken();
+      setUser(null);
+      setToken(null);
+      setSessionEnded({ reason, message });
+    });
+    return () => setSessionEndedHandler(null);
+  }, []);
+
+  const clearSessionEnded = useCallback(() => setSessionEnded(null), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -158,6 +204,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   const logout = useCallback(async () => {
+    // First, so a request still in flight that comes back 401 once the token
+    // is revoked is not mistaken for the server ending the session.
+    currentToken.current = null;
+
     try {
       /*
        * Before the token is revoked, because the endpoint scopes the delete to
@@ -181,6 +231,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [token]);
 
+  const deleteAccount = useCallback(
+    async (password: string) => {
+      if (!token) return;
+
+      // Push registrations, tokens and everything else go with the account on
+      // the server, so there is nothing to unregister first.
+      //
+      // Forgotten for the duration, so other requests failing as the account
+      // goes do not read as the session being ended on us. Put back if the
+      // delete is refused, most often for a wrong password.
+      currentToken.current = null;
+      try {
+        await deleteAccountRequest(password, token);
+      } catch (caught) {
+        currentToken.current = token;
+        throw caught;
+      }
+
+      pushToken.current = null;
+      await clearToken();
+      setUser(null);
+      setToken(null);
+    },
+    [token]
+  );
+
   const value = useMemo(
     () => ({
       user,
@@ -191,9 +267,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       resetPassword,
       logout,
+      deleteAccount,
       refreshUser,
+      sessionEnded,
+      clearSessionEnded,
     }),
-    [user, token, isRestoring, register, login, resetPassword, logout, refreshUser]
+    [
+      user,
+      token,
+      isRestoring,
+      register,
+      login,
+      resetPassword,
+      logout,
+      deleteAccount,
+      refreshUser,
+      sessionEnded,
+      clearSessionEnded,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

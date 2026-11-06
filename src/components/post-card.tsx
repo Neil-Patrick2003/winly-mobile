@@ -36,6 +36,8 @@ import {
 import { goBack } from '@/lib/navigation';
 import { timeAgo } from '@/lib/time';
 import { useToast } from '@/lib/toast';
+import { BLOCK_ICON, REPORT_ICON } from '@/lib/moderation';
+import { useModeration } from '@/lib/use-moderation';
 
 /**
  * One counter under a post.
@@ -608,6 +610,7 @@ export function PostCard({
   const { author, wins } = post;
   const showToast = useToast();
   const confirm = useConfirm();
+  const moderation = useModeration();
   const theme = useTheme();
 
   /*
@@ -840,7 +843,25 @@ export function PostCard({
             onPress: () => void onDelete(),
           },
         ]
-      : []),
+      : [
+          {
+            label: 'Report post',
+            icon: REPORT_ICON,
+            onPress: () => moderation.report('post', post.id, { id: author.id, name: displayName }),
+          },
+          {
+            label: `Block ${displayName}`,
+            icon: BLOCK_ICON,
+            destructive: true,
+            onPress: async () => {
+              if (await moderation.block({ id: author.id, name: displayName })) {
+                // Off the screen now rather than at the next refresh.
+                removePost(post.id);
+                if (detail) goBack();
+              }
+            },
+          },
+        ]),
   ];
 
   // The substance of a learning win is its text, which is too long for a pill.

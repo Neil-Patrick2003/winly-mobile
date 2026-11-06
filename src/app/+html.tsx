@@ -97,6 +97,38 @@ export default function Root({ children }: PropsWithChildren) {
         <ScrollViewStyleReset />
 
         {/*
+          The app is designed for a phone, so on a wider window it stays the
+          width of one, centred, rather than stretching every screen, header and
+          tab bar across a desktop monitor. Below 480px it is simply full width,
+          which is every phone and an installed PWA on one.
+
+          Set on `#root` rather than on each screen so nothing can be missed,
+          the tab bar included. React Native Web's `Modal` portals into
+          `document.body`, outside `#root`, so dialogs, menus and the lightbox
+          still cover the whole window, which is what they are built to do.
+
+          After the reset on purpose, so these rules win where both say something.
+        */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              body { background-color: #E3EAE0; }
+              #root {
+                position: relative;
+                width: 100%;
+                max-width: 480px;
+                margin: 0 auto;
+                background-color: #F4F7F2;
+                overflow: hidden;
+              }
+              @media (min-width: 481px) {
+                #root { box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.06), 0 12px 40px rgba(15, 23, 42, 0.10); }
+              }
+            `,
+          }}
+        />
+
+        {/*
           Registered from an inline script rather than from the app, because it
           has to happen whether or not the bundle ever finishes loading — the
           offline shell is exactly what a device that cannot fetch the bundle

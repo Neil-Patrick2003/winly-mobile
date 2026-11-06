@@ -116,6 +116,8 @@ export type PublicProfile = {
 
   is_private: boolean;
   is_self: boolean;
+  /** Whether you have blocked them. Someone who blocked you is a 404 instead. */
+  is_blocked?: boolean;
   /** Absent where the endpoint did not look — not the same as false. */
   is_following?: boolean;
   /** Whether they follow you back. */

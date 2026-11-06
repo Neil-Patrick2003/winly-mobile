@@ -1,12 +1,5 @@
-/**
- * Thin fetch wrapper for the Laravel backend.
- *
- * The base URL is overridable because `winly-backend.test` is a Herd/Valet
- * domain resolved by the Mac's DNS: the iOS simulator inherits that, but a
- * physical device or an Android emulator does not. Point EXPO_PUBLIC_API_URL at
- * the machine's LAN address there.
- */
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://winly.on-forge.com';
+
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 /** Laravel's validation-error envelope. */
 type LaravelErrorBody = {
@@ -67,6 +60,35 @@ function toFieldErrors(errors: Record<string, string[]> | undefined) {
     if (messages[0]) flat[field] = messages[0];
   }
   return flat;
+}
+
+/**
+ * Why the server stopped accepting this device's session.
+ *
+ * `expired` is a 401: the token was revoked, by signing out elsewhere, a
+ * password reset, or the account being deleted. `disabled` is staff having
+ * switched the account off.
+ */
+export type SessionEndReason = 'expired' | 'disabled';
+
+/** Kept in step with `EnsureAccountIsActive::MESSAGE` on the server. */
+const DISABLED_PREFIX = 'This account has been disabled';
+
+let onSessionEnded: ((token: string, reason: SessionEndReason, message: string) => void) | null =
+  null;
+
+/**
+ * Register what happens when a signed-in request is refused because the
+ * session itself is gone. The auth provider uses it to sign out locally, so a
+ * revoked or disabled account is not left on screens that can only fail.
+ *
+ * Told which token was refused, so a late reply for a session that has already
+ * been replaced cannot sign out the new one.
+ */
+export function setSessionEndedHandler(
+  handler: ((token: string, reason: SessionEndReason, message: string) => void) | null
+) {
+  onSessionEnded = handler;
 }
 
 type RequestOptions = {
@@ -148,6 +170,16 @@ async function apiRequest<TResponse>(
     throw new ApiError(413, data.message ?? 'That file is too large to upload. Try a smaller one.');
   }
 
+  // Only for requests that carried a session. A 401 from signing in is a wrong
+  // password, not a session ending.
+  if (token) {
+    if (response.status === 401) {
+      onSessionEnded?.(token, 'expired', 'You were signed out. Please sign in again.');
+    } else if (response.status === 403 && data.message?.startsWith(DISABLED_PREFIX)) {
+      onSessionEnded?.(token, 'disabled', data.message);
+    }
+  }
+
   if (response.status === 429) {
     const header = Number(response.headers.get('Retry-After'));
     // The login limiter states the wait in its message rather than the header,
@@ -189,6 +221,7 @@ export function apiPatch<TResponse>(path: string, body?: unknown, token?: string
   return apiRequest<TResponse>('PATCH', path, { body, token });
 }
 
-export function apiDelete<TResponse>(path: string, token?: string | null) {
-  return apiRequest<TResponse>('DELETE', path, { token });
+/** `body` is for the rare delete that has to say something, like a password. */
+export function apiDelete<TResponse>(path: string, token?: string | null, body?: unknown) {
+  return apiRequest<TResponse>('DELETE', path, { body, token });
 }

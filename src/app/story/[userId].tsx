@@ -602,6 +602,35 @@ export default function StoryViewerScreen() {
             </Pressable>
           ) : null}
 
+          {/* Reporting leaves the viewer rather than opening over it: the story
+              would keep playing underneath, and going back after reporting
+              should not drop you into the middle of it again. */}
+          {isMine || !author ? null : (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Report this story"
+              onPress={() =>
+                router.replace({
+                  pathname: '/report',
+                  params: {
+                    type: 'story',
+                    id: current.id,
+                    authorId: author.id,
+                    authorName: author.username ?? author.full_name,
+                  },
+                })
+              }
+              hitSlop={10}
+              className="p-1 active:opacity-60">
+              <SymbolView
+                name={{ ios: 'flag', android: 'flag', web: 'flag' }}
+                size={17}
+                weight="bold"
+                tintColor="#FFFFFF"
+              />
+            </Pressable>
+          )}
+
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Close stories"

@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PILLAR_THEME } from '@/components/entry-chrome';
 import { ProfileAvatar } from '@/components/profile-avatar';
 import { ProfileCover } from '@/components/profile-cover';
+import { MenuButton, type MenuItem } from '@/components/ui/menu';
 import { Colors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
@@ -30,6 +31,8 @@ import { fetchUserProfile, type PublicProfile } from '@/lib/profile';
 import { timeAgo } from '@/lib/time';
 import { useToast } from '@/lib/toast';
 import { goBack } from '@/lib/navigation';
+import { BLOCK_ICON, REPORT_ICON, unblockUser } from '@/lib/moderation';
+import { useModeration } from '@/lib/use-moderation';
 
 const STREAK_ORANGE = '#E28F43';
 const CORAL = '#E5484D';
@@ -153,7 +156,7 @@ export default function UserProfileScreen() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const { token } = useAuth();
-  const { followState, setFollowed, adoptSavedState } = useFeed();
+  const { followState, setFollowed, adoptSavedState, refresh: refreshFeed } = useFeed();
   const showToast = useToast();
   const confirm = useConfirm();
 
@@ -164,6 +167,7 @@ export default function UserProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [following, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const moderation = useModeration();
 
   const cursor = useRef<string | null>(null);
   const atEnd = useRef(false);
@@ -299,6 +303,28 @@ export default function UserProfileScreen() {
     }
   }, [confirm, token, profile, following, isFollowing, setFollowed, showToast]);
 
+  const blockThem = async () => {
+    if (!profile) return;
+    const blocked = await moderation.block({ id: profile.id, name: profile.username });
+    if (blocked) {
+      setProfile({ ...profile, is_blocked: true, is_following: false, follows_you: false });
+      setFollowed(profile.id, false);
+      setPosts([]);
+    }
+  };
+
+  const unblockThem = async () => {
+    if (!profile || !token) return;
+    try {
+      await unblockUser(profile.id, token);
+      showToast(`Unblocked ${profile.username}`);
+      void refreshFeed();
+      await load();
+    } catch (caught) {
+      showToast(caught instanceof Error ? caught.message : 'Could not unblock them. Try again.');
+    }
+  };
+
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-surface">
@@ -324,6 +350,32 @@ export default function UserProfileScreen() {
   }
 
   const initial = (profile.full_name.trim()[0] ?? profile.username[0] ?? '?').toUpperCase();
+
+  // Once blocked, reporting no longer offers to block them again.
+  const profileMenu: MenuItem[] = [
+    {
+      label: 'Report account',
+      icon: REPORT_ICON,
+      onPress: () =>
+        moderation.report(
+          'user',
+          profile.id,
+          profile.is_blocked ? undefined : { id: profile.id, name: profile.username }
+        ),
+    },
+    profile.is_blocked
+      ? {
+          label: `Unblock ${profile.username}`,
+          icon: BLOCK_ICON,
+          onPress: () => void unblockThem(),
+        }
+      : {
+          label: `Block ${profile.username}`,
+          icon: BLOCK_ICON,
+          destructive: true,
+          onPress: () => void blockThem(),
+        },
+  ];
   const streak = profile.streak_days;
 
   return (
@@ -345,7 +397,7 @@ export default function UserProfileScreen() {
           {/* Following reads as a state you can undo, not an invitation — so it
               is outlined where Follow is filled. Your own profile arrives here
               only by a stray link, and has nothing to offer but the way back. */}
-          {profile.is_self ? null : (
+          {profile.is_self || profile.is_blocked ? null : (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={isFollowing ? `Unfollow ${profile.username}` : `Follow ${profile.username}`}
@@ -439,11 +491,30 @@ export default function UserProfileScreen() {
           </View>
         ) : null}
 
-        <Text className="mt-6 px-4 font-heading-bold text-lg leading-6 text-ink">
-          {profile.is_self ? 'My posts' : 'Their posts'}
-        </Text>
+        {profile.is_blocked ? (
+          <View className="mx-4 mt-6 items-center gap-3 rounded-3xl bg-surface-card px-5 py-8">
+            <Text className="text-center font-body-semibold text-base leading-6 text-ink">
+              You blocked {profile.username}
+            </Text>
+            <Text className="text-center font-sans text-sm leading-5 text-ink-muted">
+              You won&rsquo;t see each other&rsquo;s posts, comments or stories.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void unblockThem()}
+              className="mt-1 rounded-full border border-hairline px-5 py-2.5 active:opacity-70">
+              <Text className="font-body-semibold text-[14px] leading-5 text-ink">Unblock</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
-        {posts.length > 0 ? (
+        {profile.is_blocked ? null : (
+          <Text className="mt-6 px-4 font-heading-bold text-lg leading-6 text-ink">
+            {profile.is_self ? 'My posts' : 'Their posts'}
+          </Text>
+        )}
+
+        {profile.is_blocked ? null : posts.length > 0 ? (
           posts.map((post) => <WinRow key={post.id} post={post} />)
         ) : (
           <View className="mx-4 mt-3 items-center gap-2 rounded-3xl bg-surface-card px-5 py-10">
@@ -469,6 +540,19 @@ export default function UserProfileScreen() {
           </Pressable>
         ) : null}
       </ScrollView>
+
+      {/* Report and block, top right, mirroring the back button. */}
+      {profile.is_self ? null : (
+        <View
+          className="absolute right-4 h-10 w-10 items-center justify-center rounded-full bg-black/15"
+          style={{ top: insets.top + 4 }}>
+          <MenuButton
+            accessibilityLabel={`More options for ${profile.username}`}
+            tintColor="#FFFFFF"
+            items={profileMenu}
+          />
+        </View>
+      )}
 
       {/* Floated over the cover, white because it sits on the gradient. */}
       <Pressable

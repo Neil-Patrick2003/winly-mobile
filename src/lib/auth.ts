@@ -1,6 +1,6 @@
 import * as Device from 'expo-device';
 
-import { apiGet, apiPost } from '@/lib/api';
+import { apiDelete, apiGet, apiPost } from '@/lib/api';
 
 export type User = {
   /** A UUID, not a sequential integer — never do arithmetic or ordering on it. */
@@ -71,6 +71,8 @@ export type RegisterInput = {
   email: string;
   password: string;
   passwordConfirmation: string;
+  /** Ticked "I agree" on the sign-up screen. The server refuses without it. */
+  acceptTerms: boolean;
 };
 
 /**
@@ -89,6 +91,7 @@ export function registerRequest(input: RegisterInput) {
     email: input.email.trim(),
     password: input.password,
     password_confirmation: input.passwordConfirmation,
+    accept_terms: input.acceptTerms,
     device_name: getDeviceName(),
   });
 }
@@ -124,7 +127,9 @@ export function loginRequest(input: LoginInput) {
  * the screen must move on to the code step regardless of what comes back.
  */
 export function requestPasswordResetCode(email: string) {
-  return apiPost<{ message: string }>('/api/v1/forgot-password', { email: email.trim() });
+  return apiPost<{ message: string }>('/api/v1/forgot-password', {
+    email: email.trim(),
+  });
 }
 
 export type ResetPasswordInput = {
@@ -160,6 +165,16 @@ export function resetPasswordRequest(input: ResetPasswordInput) {
  */
 export function logoutRequest(token: string) {
   return apiPost<void>('/api/v1/logout', undefined, token);
+}
+
+/**
+ * DELETE /api/v1/profile — deletes the account and everything in it, for good.
+ *
+ * Asks for the password again. A wrong one is a 422 with a `password` field
+ * error. Every token goes with the account, so a 204 means sign out locally.
+ */
+export function deleteAccountRequest(password: string, token: string) {
+  return apiDelete<void>('/api/v1/profile', token, { password });
 }
 
 /**
